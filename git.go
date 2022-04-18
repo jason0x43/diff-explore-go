@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"log"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
 type commit struct {
 	Commit      string
+	Decoration  string
 	AuthorName  string
 	AuthorEmail string
 	Timestamp   int64
@@ -20,8 +22,10 @@ func gitLog() []commit {
 		"git",
 		"log",
 		"--date=iso8601-strict",
+		"--decorate",
 		"--pretty=format:{%n"+
 			"  \"commit\": \"%H\",%n"+
+			"  \"decoration\": \"%d\",%n"+
 			"  \"authorName\": \"%aN\",%n"+
 			"  \"authorEmail\": \"%aE\",%n"+
 			"  \"timestamp\": %at,%n"+
@@ -42,7 +46,7 @@ func gitLog() []commit {
 
 type stat struct {
 	Change rune
-	Path string
+	Path   string
 }
 
 func gitDiffStat(a, b string) []stat {
@@ -50,7 +54,7 @@ func gitDiffStat(a, b string) []stat {
 		"git",
 		"diff",
 		"--name-status",
-		a + ".." + b,
+		a+".."+b,
 	).Output()
 	if err != nil {
 		log.Fatal(err)
@@ -75,7 +79,7 @@ func gitDiff(a, b, path string) []string {
 		"git",
 		"diff-tree",
 		"-p",
-		a + ".." + b,
+		a+".."+b,
 		path,
 	).Output()
 	if err != nil {
@@ -83,4 +87,35 @@ func gitDiff(a, b, path string) []string {
 	}
 
 	return strings.Split(string(out), "\n")
+}
+
+type decor struct {
+	branches []string
+	tags     []string
+	refs     []string
+}
+
+func parseDecoration(decoration string) (d decor) {
+	decoration = strings.Trim(decoration, " () ")
+	decors := strings.Split(decoration, ", ")
+
+	headBranchRe := regexp.MustCompile(`^\w+ ->`)
+	tagRe := regexp.MustCompile(`^tag: `)
+	refsRe := regexp.MustCompile(`^\w+/`)
+
+	for _, decor := range decors {
+		if headBranchRe.MatchString(decor) {
+			b := strings.Split(decor, " -> ")[1]
+			d.branches = append(d.branches, b)
+		} else if tagRe.MatchString(decor) {
+			t := strings.SplitN(decor, ": ", 2)[1]
+			d.tags = append(d.tags, t)
+		} else if refsRe.MatchString(decor) {
+			d.refs = append(d.refs, decor)
+		} else {
+			d.branches = append(d.branches, decor)
+		}
+	}
+
+	return
 }

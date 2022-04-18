@@ -25,6 +25,12 @@ var nameStyle = lipgloss.NewStyle().
 	Width(21).
 	PaddingRight(1).
 	Foreground(lipgloss.Color("2"))
+var branchStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("6"))
+var tagStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("5"))
+var refStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("3"))
 var subjectStyle = lipgloss.NewStyle().Inline(true)
 var statusStyle = lipgloss.NewStyle().
 	Inline(true).
@@ -126,13 +132,47 @@ func (m appModel) renderCommit(index int) string {
 		hashStyle.Background(cursorBg)
 		ageStyle.Background(cursorBg)
 		nameStyle.Background(cursorBg)
+		branchStyle.Background(cursorBg)
+		tagStyle.Background(cursorBg)
+		refStyle.Background(cursorBg)
 		subjectStyle.Background(cursorBg)
 	} else {
 		markerStyle.UnsetBackground()
 		hashStyle.UnsetBackground()
 		ageStyle.UnsetBackground()
 		nameStyle.UnsetBackground()
+		branchStyle.UnsetBackground()
+		tagStyle.UnsetBackground()
+		refStyle.UnsetBackground()
 		subjectStyle.UnsetBackground()
+	}
+
+	branches := ""
+	tags := ""
+	refs := ""
+
+	if c.Decoration != "" {
+		info := parseDecoration(c.Decoration)
+		for _, b := range info.branches {
+			branches += fmt.Sprintf("[%s] ", b)
+		}
+		if branches != "" {
+			branches = branchStyle.Render(branches)
+		}
+
+		for _, t := range info.tags {
+			tags += fmt.Sprintf("<%s> ", t)
+		}
+		if tags != "" {
+			tags = tagStyle.Render(tags)
+		}
+
+		for _, r := range info.refs {
+			refs += fmt.Sprintf("{%s} ", r)
+		}
+		if refs != "" {
+			refs = refStyle.Render(refs)
+		}
 	}
 
 	return lipgloss.JoinHorizontal(
@@ -141,6 +181,9 @@ func (m appModel) renderCommit(index int) string {
 		hashStyle.Render(c.Commit[0:8]),
 		ageStyle.Render(age),
 		nameStyle.Render(name),
+		branches,
+		tags,
+		refs,
 		subjectStyle.Render(c.Subject),
 	)
 }
