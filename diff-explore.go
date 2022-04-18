@@ -10,24 +10,35 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var cursorBg = lipgloss.AdaptiveColor{Light: "#dddddd", Dark: "#444444"}
+var cursorBg = lipgloss.Color("0")
 var markerStyle = lipgloss.NewStyle().Width(2)
 var hashStyle = lipgloss.NewStyle().
 	Width(9).
 	PaddingRight(1).
-	Foreground(lipgloss.Color("#dd77dd"))
+	Foreground(lipgloss.Color("5"))
 var ageStyle = lipgloss.NewStyle().
 	Align(lipgloss.Right).
 	Width(4).
-	PaddingRight(1)
+	PaddingRight(1).
+	Foreground(lipgloss.Color("4"))
 var nameStyle = lipgloss.NewStyle().
 	Width(21).
-	PaddingRight(1)
+	PaddingRight(1).
+	Foreground(lipgloss.Color("2"))
 var subjectStyle = lipgloss.NewStyle().Inline(true)
 var statusStyle = lipgloss.NewStyle().
 	Inline(true).
-	Background(lipgloss.AdaptiveColor{Light: "#ddddff", Dark: "#444466"})
+	Background(lipgloss.Color("8")).
+	Foreground(lipgloss.Color("15"))
 var statStyle = lipgloss.NewStyle().Inline(true)
+var diffAddStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("2"))
+var diffDelStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("1"))
+var diffModStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("18"))
+var diffSepStyle = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("6"))
 
 type view string
 
@@ -154,6 +165,23 @@ func (m appModel) renderStat(index int) string {
 	)
 }
 
+func (m appModel) renderDiffLine(index int) string {
+	d := m.diff[index]
+
+	if len(d) > 0 {
+		switch d[0] {
+		case '-':
+			return diffDelStyle.Render(d)
+		case '+':
+			return diffAddStyle.Render(d)
+		case '@':
+			return diffSepStyle.Render(d)
+		}
+	}
+
+	return d
+}
+
 func (m appModel) currentView() view {
 	return m.history[len(m.history)-1]
 }
@@ -166,6 +194,22 @@ func (m appModel) pushView(view view) appModel {
 func (m appModel) popView() appModel {
 	m.history = m.history[:len(m.history)-1]
 	return m
+}
+
+func (m appModel) getStatus() string {
+	switch m.currentView() {
+	case statsView:
+		commitA := m.commits[m.commitsList.cursor].Commit[:8]
+		commitB := "HEAD"
+		return fmt.Sprintf("%s..%s", commitA, commitB)
+	case diffView:
+		commitA := m.commits[m.commitsList.cursor].Commit[:8]
+		commitB := "HEAD"
+		path := m.stats[m.statsList.cursor].Path
+		return fmt.Sprintf("%s..%s: %s", commitA, commitB, path)
+	}
+
+	return ""
 }
 
 func (m listModel) setHeight(height int) listModel {
@@ -279,7 +323,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c":
 			return m, tea.Quit
 
 		case " ":
@@ -337,7 +381,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					count:  len(m.stats),
 					marked: -1}
 				m.statsList = m.statsList.setHeight(m.height)
-				m.status = fmt.Sprintf("%s..%s", commitA, commitB)
+				m.status = m.getStatus()
 			} else if m.currentView() == statsView {
 				commitA := m.commits[m.commitsList.cursor].Commit[:8]
 				commitB := "HEAD"
@@ -349,19 +393,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					marked: -1,
 					cursor: -1}
 				m.diffModel = m.diffModel.setHeight(m.height)
-				m.status = fmt.Sprintf(
-					"%s..%s: %s",
-					commitA,
-					commitB,
-					path)
 				m = m.pushView(diffView)
+				m.status = m.getStatus()
 			}
 
-		case "esc":
+		case "esc", "q":
 			if len(m.history) == 1 {
 				return m, tea.Quit
 			}
 			m = m.popView()
+			m.status = m.getStatus()
 		}
 	}
 
@@ -389,7 +430,7 @@ func (m appModel) View() string {
 	case diffView:
 		var lines []string
 		for i := m.diffModel.first; i < m.diffModel.last; i++ {
-			lines = append(lines, m.diff[i])
+			lines = append(lines, m.renderDiffLine(i))
 		}
 		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
 	}
