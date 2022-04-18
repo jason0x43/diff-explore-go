@@ -256,10 +256,10 @@ func (m appModel) getStatus() string {
 }
 
 func (m listModel) setHeight(height int) listModel {
-	if height < m.count {
-		m.height = height
+	if height > m.count {
+		m.height = m.count + 1
 	} else {
-		m.height = m.count
+		m.height = height
 	}
 	m.last = m.first + m.height - 1
 	if m.cursor > m.last-1 {
@@ -419,10 +419,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				commitA := m.commits[m.commitsList.cursor].Commit[:8]
 				commitB := "HEAD"
 				m.stats = gitDiffStat(commitA, commitB)
-				m = m.pushView(statsView)
 				m.statsList = listModel{
 					count:  len(m.stats),
 					marked: -1}
+				m = m.pushView(statsView)
 				m.statsList = m.statsList.setHeight(m.height)
 				m.status = m.getStatus()
 			} else if m.currentView() == statsView {
