@@ -45,7 +45,7 @@ type stat struct {
 	Path string
 }
 
-func gitDiffStat(a string, b string) []stat {
+func gitDiffStat(a, b string) []stat {
 	out, err := exec.Command(
 		"git",
 		"diff",
@@ -68,4 +68,19 @@ func gitDiffStat(a string, b string) []stat {
 	}
 
 	return stats
+}
+
+func gitDiff(a, b, path string) []string {
+	out, err := exec.Command(
+		"git",
+		"diff-tree",
+		"-p",
+		a + ".." + b,
+		path,
+	).Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return strings.Split(string(out), "\n")
 }

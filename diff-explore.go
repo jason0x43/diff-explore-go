@@ -17,6 +17,7 @@ var hashStyle = lipgloss.NewStyle().
 	PaddingRight(1).
 	Foreground(lipgloss.Color("#dd77dd"))
 var ageStyle = lipgloss.NewStyle().
+	Align(lipgloss.Right).
 	Width(4).
 	PaddingRight(1)
 var nameStyle = lipgloss.NewStyle().
@@ -32,7 +33,8 @@ type view string
 
 const (
 	commitsView view = "commits"
-	statsView        = "files"
+	statsView        = "stats"
+	diffView         = "diff"
 )
 
 type listModel struct {
@@ -52,11 +54,12 @@ type appModel struct {
 	commits     []commit
 	commitsList listModel
 
-	// file list
 	stats     []stat
 	statsList listModel
 
-	// status line
+	diff      []string
+	diffModel listModel
+
 	status string
 }
 
@@ -155,6 +158,16 @@ func (m appModel) currentView() view {
 	return m.history[len(m.history)-1]
 }
 
+func (m appModel) pushView(view view) appModel {
+	m.history = append(m.history, view)
+	return m
+}
+
+func (m appModel) popView() appModel {
+	m.history = m.history[:len(m.history)-1]
+	return m
+}
+
 func (m listModel) setHeight(height int) listModel {
 	if height < m.count {
 		m.height = height
@@ -170,35 +183,55 @@ func (m listModel) setHeight(height int) listModel {
 }
 
 func (m listModel) nextPage() listModel {
-	m.cursor += m.height
+	if m.cursor != -1 {
+		m.cursor += m.height
+	}
+
 	m.first += m.height
 	m.last += m.height
 	if m.last >= m.count {
 		m.last = m.count - 1
 		m.first = m.last - m.height + 1
 	}
-	if m.cursor > m.last {
-		m.cursor = m.last
+
+	if m.cursor != -1 {
+		if m.cursor > m.last {
+			m.cursor = m.last
+		}
 	}
+
 	return m
 }
 
 func (m listModel) prevPage() listModel {
-	m.cursor -= m.height
+	if m.cursor != -1 {
+		m.cursor -= m.height
+	}
+
 	m.first -= m.height
 	m.last -= m.height
 	if m.first < 0 {
 		m.first = 0
 		m.last = m.first + m.height - 1
 	}
-	if m.cursor < 0 {
-		m.cursor = 0
+
+	if m.cursor != -1 {
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
 	}
+
 	return m
 }
 
 func (m listModel) nextItem() listModel {
-	if m.cursor < m.count-1 {
+	if m.cursor == -1 {
+		// Not using cursor
+		if m.last < m.count-1 {
+			m.first += 1
+			m.last += 1
+		}
+	} else if m.cursor < m.count-1 {
 		m.cursor += 1
 		if m.cursor > m.last-1 {
 			m.first += 1
@@ -209,7 +242,13 @@ func (m listModel) nextItem() listModel {
 }
 
 func (m listModel) prevItem() listModel {
-	if m.cursor > 0 {
+	if m.cursor == -1 {
+		// Not using cursor
+		if m.first > 0 {
+			m.first -= 1
+			m.last -= 1
+		}
+	} else if m.cursor > 0 {
 		m.cursor -= 1
 		if m.cursor < m.first {
 			m.first -= 1
@@ -234,6 +273,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.commitsList = m.commitsList.setHeight(m.height)
 		} else if m.currentView() == statsView {
 			m.statsList = m.statsList.setHeight(m.height)
+		} else if m.currentView() == diffView {
+			m.diffModel = m.diffModel.setHeight(m.height)
 		}
 
 	case tea.KeyMsg:
@@ -255,6 +296,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commitsList = m.commitsList.nextPage()
 			} else if m.currentView() == statsView {
 				m.statsList = m.statsList.nextPage()
+			} else if m.currentView() == diffView {
+				m.diffModel = m.diffModel.nextPage()
 			}
 
 		case "ctrl+u":
@@ -262,6 +305,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commitsList = m.commitsList.prevPage()
 			} else if m.currentView() == statsView {
 				m.statsList = m.statsList.prevPage()
+			} else if m.currentView() == diffView {
+				m.diffModel = m.diffModel.prevPage()
 			}
 
 		case "j":
@@ -269,6 +314,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commitsList = m.commitsList.nextItem()
 			} else if m.currentView() == statsView {
 				m.statsList = m.statsList.nextItem()
+			} else if m.currentView() == diffView {
+				m.diffModel = m.diffModel.nextItem()
 			}
 
 		case "k":
@@ -276,31 +323,45 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.commitsList = m.commitsList.prevItem()
 			} else if m.currentView() == statsView {
 				m.statsList = m.statsList.prevItem()
+			} else if m.currentView() == diffView {
+				m.diffModel = m.diffModel.prevItem()
 			}
 
 		case "enter":
 			if m.currentView() == commitsView {
-				m.stats = gitDiffStat(
-					m.commits[m.commitsList.cursor].Commit,
-					"HEAD",
-				)
-				m.history = append(m.history, statsView)
+				commitA := m.commits[m.commitsList.cursor].Commit[:8]
+				commitB := "HEAD"
+				m.stats = gitDiffStat(commitA, commitB)
+				m = m.pushView(statsView)
 				m.statsList = listModel{
 					count:  len(m.stats),
-					marked: -1,
-				}
+					marked: -1}
 				m.statsList = m.statsList.setHeight(m.height)
+				m.status = fmt.Sprintf("%s..%s", commitA, commitB)
+			} else if m.currentView() == statsView {
+				commitA := m.commits[m.commitsList.cursor].Commit[:8]
+				commitB := "HEAD"
+				path := m.stats[m.statsList.cursor].Path
+
+				m.diff = gitDiff(commitA, commitB, path)
+				m.diffModel = listModel{
+					count:  len(m.diff),
+					marked: -1,
+					cursor: -1}
+				m.diffModel = m.diffModel.setHeight(m.height)
 				m.status = fmt.Sprintf(
-					"%s..HEAD", 
-					m.commits[m.commitsList.cursor].Commit[:8],
-				)
+					"%s..%s: %s",
+					commitA,
+					commitB,
+					path)
+				m = m.pushView(diffView)
 			}
 
 		case "esc":
 			if len(m.history) == 1 {
 				return m, tea.Quit
 			}
-			m.history = m.history[:len(m.history)-1]
+			m = m.popView()
 		}
 	}
 
@@ -310,7 +371,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m appModel) View() string {
 	mainSection := ""
 
-	switch m.history[len(m.history)-1] {
+	switch m.currentView() {
 	case commitsView:
 		var lines []string
 		for i := m.commitsList.first; i < m.commitsList.last; i++ {
@@ -322,6 +383,13 @@ func (m appModel) View() string {
 		var lines []string
 		for i := m.statsList.first; i < m.statsList.last; i++ {
 			lines = append(lines, m.renderStat(i))
+		}
+		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
+
+	case diffView:
+		var lines []string
+		for i := m.diffModel.first; i < m.diffModel.last; i++ {
+			lines = append(lines, m.diff[i])
 		}
 		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
 	}
