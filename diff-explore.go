@@ -80,6 +80,13 @@ type appModel struct {
 	status string
 }
 
+func trunc(s string, size int) string {
+	if len(s) > size {
+		return s[:size]
+	}
+	return s
+}
+
 func (m appModel) renderCommit(index int) string {
 	c := m.commits[index]
 
@@ -118,7 +125,7 @@ func (m appModel) renderCommit(index int) string {
 
 	marker := ""
 	if index == m.commitsList.marked {
-		marker = "*"
+		marker = "▶"
 	}
 
 	subjectStyle.Width(m.width -
@@ -239,17 +246,34 @@ func (m appModel) popView() appModel {
 	return m
 }
 
+func (m appModel) getCommitRange() (start, end string) {
+	start = m.commits[m.commitsList.cursor].Commit
+	end = "HEAD"
+
+	if m.commitsList.marked >= 0 {
+		if m.commitsList.marked > m.commitsList.cursor {
+			end = start
+			start = m.commits[m.commitsList.marked].Commit
+		} else {
+			end = m.commits[m.commitsList.marked].Commit
+		}
+	}
+
+	return
+}
+
 func (m appModel) getStatus() string {
 	switch m.currentView() {
+	case commitsView:
+		start, end := m.getCommitRange()
+		return fmt.Sprintf("%s..%s", trunc(start, 8), trunc(end, 8))
 	case statsView:
-		commitA := m.commits[m.commitsList.cursor].Commit[:8]
-		commitB := "HEAD"
-		return fmt.Sprintf("%s..%s", commitA, commitB)
+		start, end := m.getCommitRange()
+		return fmt.Sprintf("%s..%s", trunc(start, 8), trunc(end, 8))
 	case diffView:
-		commitA := m.commits[m.commitsList.cursor].Commit[:8]
-		commitB := "HEAD"
+		start, end := m.getCommitRange()
 		path := m.stats[m.statsList.cursor].Path
-		return fmt.Sprintf("%s..%s: %s", commitA, commitB, path)
+		return fmt.Sprintf("%s..%s: %s", trunc(start, 8), trunc(end, 8), path)
 	}
 
 	return ""
@@ -416,28 +440,24 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "enter":
 			if m.currentView() == commitsView {
-				commitA := m.commits[m.commitsList.cursor].Commit[:8]
-				commitB := "HEAD"
-				m.stats = gitDiffStat(commitA, commitB)
+				start, end := m.getCommitRange()
+				m.stats = gitDiffStat(start, end)
 				m.statsList = listModel{
 					count:  len(m.stats),
 					marked: -1}
 				m = m.pushView(statsView)
 				m.statsList = m.statsList.setHeight(m.height)
-				m.status = m.getStatus()
 			} else if m.currentView() == statsView {
-				commitA := m.commits[m.commitsList.cursor].Commit[:8]
-				commitB := "HEAD"
+				start, end := m.getCommitRange()
 				path := m.stats[m.statsList.cursor].Path
 
-				m.diff = gitDiff(commitA, commitB, path)
+				m.diff = gitDiff(start, end, path)
 				m.diffModel = listModel{
 					count:  len(m.diff),
 					marked: -1,
 					cursor: -1}
 				m.diffModel = m.diffModel.setHeight(m.height)
 				m = m.pushView(diffView)
-				m.status = m.getStatus()
 			}
 
 		case "esc", "q":
@@ -445,9 +465,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			m = m.popView()
-			m.status = m.getStatus()
 		}
 	}
+
+	m.status = m.getStatus()
 
 	return m, nil
 }
