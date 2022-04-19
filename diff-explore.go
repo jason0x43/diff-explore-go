@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+
+	// "os"
 	"strings"
 	"time"
 
@@ -10,43 +13,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-var cursorBg = lipgloss.Color("0")
-var markerStyle = lipgloss.NewStyle().Width(2)
-var hashStyle = lipgloss.NewStyle().
-	Width(9).
-	PaddingRight(1).
-	Foreground(lipgloss.Color("5"))
-var ageStyle = lipgloss.NewStyle().
-	Align(lipgloss.Right).
-	Width(4).
-	PaddingRight(1).
-	Foreground(lipgloss.Color("4"))
-var nameStyle = lipgloss.NewStyle().
-	Width(21).
-	PaddingRight(1).
-	Foreground(lipgloss.Color("2"))
-var branchStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("6"))
-var tagStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("5"))
-var refStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("3"))
-var subjectStyle = lipgloss.NewStyle().Inline(true)
-var statusStyle = lipgloss.NewStyle().
-	Inline(true).
-	Background(lipgloss.Color("8")).
-	Foreground(lipgloss.Color("15"))
-var statStyle = lipgloss.NewStyle().Inline(true)
-var diffAddStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("2"))
-var diffDelStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("1"))
-var diffModStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("18"))
-var diffSepStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color("6"))
-
 type view string
+
+type filechange struct {
+	path string
+}
 
 const (
 	commitsView view = "commits"
@@ -54,13 +25,9 @@ const (
 	diffView         = "diff"
 )
 
-type listModel struct {
-	count  int
-	first  int
-	last   int
-	height int
-	cursor int
-	marked int
+type diffModel struct {
+	path string
+	list listModel
 }
 
 type appModel struct {
@@ -75,7 +42,7 @@ type appModel struct {
 	statsList listModel
 
 	diff      []string
-	diffModel listModel
+	diffModel diffModel
 
 	status string
 }
@@ -248,7 +215,7 @@ func (m appModel) popView() appModel {
 
 func (m appModel) getCommitRange() (start, end string) {
 	start = m.commits[m.commitsList.cursor].Commit
-	end = "HEAD"
+	end = ""
 
 	if m.commitsList.marked >= 0 {
 		if m.commitsList.marked > m.commitsList.cursor {
@@ -266,107 +233,26 @@ func (m appModel) getStatus() string {
 	switch m.currentView() {
 	case commitsView:
 		start, end := m.getCommitRange()
+		if end == "" {
+			end = "<index>"
+		}
 		return fmt.Sprintf("%s..%s", trunc(start, 8), trunc(end, 8))
 	case statsView:
 		start, end := m.getCommitRange()
+		if end == "" {
+			end = "<index>"
+		}
 		return fmt.Sprintf("%s..%s", trunc(start, 8), trunc(end, 8))
 	case diffView:
 		start, end := m.getCommitRange()
+		if end == "" {
+			end = "<index>"
+		}
 		path := m.stats[m.statsList.cursor].Path
 		return fmt.Sprintf("%s..%s: %s", trunc(start, 8), trunc(end, 8), path)
 	}
 
 	return ""
-}
-
-func (m listModel) setHeight(height int) listModel {
-	if height > m.count {
-		m.height = m.count + 1
-	} else {
-		m.height = height
-	}
-	m.last = m.first + m.height - 1
-	if m.cursor > m.last-1 {
-		m.last = m.cursor + 1
-		m.first = m.last - m.height + 1
-	}
-	return m
-}
-
-func (m listModel) nextPage() listModel {
-	if m.cursor != -1 {
-		m.cursor += m.height
-	}
-
-	m.first += m.height
-	m.last += m.height
-	if m.last >= m.count {
-		m.last = m.count - 1
-		m.first = m.last - m.height + 1
-	}
-
-	if m.cursor != -1 {
-		if m.cursor > m.last {
-			m.cursor = m.last
-		}
-	}
-
-	return m
-}
-
-func (m listModel) prevPage() listModel {
-	if m.cursor != -1 {
-		m.cursor -= m.height
-	}
-
-	m.first -= m.height
-	m.last -= m.height
-	if m.first < 0 {
-		m.first = 0
-		m.last = m.first + m.height - 1
-	}
-
-	if m.cursor != -1 {
-		if m.cursor < 0 {
-			m.cursor = 0
-		}
-	}
-
-	return m
-}
-
-func (m listModel) nextItem() listModel {
-	if m.cursor == -1 {
-		// Not using cursor
-		if m.last < m.count-1 {
-			m.first += 1
-			m.last += 1
-		}
-	} else if m.cursor < m.count-1 {
-		m.cursor += 1
-		if m.cursor > m.last-1 {
-			m.first += 1
-			m.last += 1
-		}
-	}
-	return m
-}
-
-func (m listModel) prevItem() listModel {
-	if m.cursor == -1 {
-		// Not using cursor
-		if m.first > 0 {
-			m.first -= 1
-			m.last -= 1
-		}
-	} else if m.cursor > 0 {
-		m.cursor -= 1
-		if m.cursor < m.first {
-			m.first -= 1
-			m.last -= 1
-		}
-	}
-	return m
 }
 
 func (m appModel) Init() tea.Cmd {
@@ -381,11 +267,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		statusStyle.Width(m.width)
 
 		if m.currentView() == commitsView {
-			m.commitsList = m.commitsList.setHeight(m.height)
+			m.commitsList.setHeight(m.height)
 		} else if m.currentView() == statsView {
-			m.statsList = m.statsList.setHeight(m.height)
+			m.statsList.setHeight(m.height)
 		} else if m.currentView() == diffView {
-			m.diffModel = m.diffModel.setHeight(m.height)
+			m.diffModel.list.setHeight(m.height)
 		}
 
 	case tea.KeyMsg:
@@ -404,38 +290,38 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "ctrl+f":
 			if m.currentView() == commitsView {
-				m.commitsList = m.commitsList.nextPage()
+				m.commitsList.nextPage()
 			} else if m.currentView() == statsView {
-				m.statsList = m.statsList.nextPage()
+				m.statsList.nextPage()
 			} else if m.currentView() == diffView {
-				m.diffModel = m.diffModel.nextPage()
+				m.diffModel.list.nextPage()
 			}
 
 		case "ctrl+u":
 			if m.currentView() == commitsView {
-				m.commitsList = m.commitsList.prevPage()
+				m.commitsList.prevPage()
 			} else if m.currentView() == statsView {
-				m.statsList = m.statsList.prevPage()
+				m.statsList.prevPage()
 			} else if m.currentView() == diffView {
-				m.diffModel = m.diffModel.prevPage()
+				m.diffModel.list.prevPage()
 			}
 
 		case "j":
 			if m.currentView() == commitsView {
-				m.commitsList = m.commitsList.nextItem()
+				m.commitsList.nextItem()
 			} else if m.currentView() == statsView {
-				m.statsList = m.statsList.nextItem()
+				m.statsList.nextItem()
 			} else if m.currentView() == diffView {
-				m.diffModel = m.diffModel.nextItem()
+				m.diffModel.list.nextItem()
 			}
 
 		case "k":
 			if m.currentView() == commitsView {
-				m.commitsList = m.commitsList.prevItem()
+				m.commitsList.prevItem()
 			} else if m.currentView() == statsView {
-				m.statsList = m.statsList.prevItem()
+				m.statsList.prevItem()
 			} else if m.currentView() == diffView {
-				m.diffModel = m.diffModel.prevItem()
+				m.diffModel.list.prevItem()
 			}
 
 		case "enter":
@@ -445,18 +331,23 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.statsList = listModel{
 					count:  len(m.stats),
 					marked: -1}
+				m.statsList.setHeight(m.height)
 				m = m.pushView(statsView)
-				m.statsList = m.statsList.setHeight(m.height)
 			} else if m.currentView() == statsView {
 				start, end := m.getCommitRange()
 				path := m.stats[m.statsList.cursor].Path
 
+				absPath, err := filepath.Abs(path)
+				if err != nil {
+					absPath = path
+				}
+
 				m.diff = gitDiff(start, end, path)
-				m.diffModel = listModel{
-					count:  len(m.diff),
-					marked: -1,
-					cursor: -1}
-				m.diffModel = m.diffModel.setHeight(m.height)
+				m.diffModel = diffModel{
+					path: absPath,
+					list: newCursorlessListModel(len(m.diff)),
+				}
+				m.diffModel.list.setHeight(m.height)
 				m = m.pushView(diffView)
 			}
 
@@ -465,6 +356,13 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			m = m.popView()
+		}
+
+	case filechange:
+		if m.currentView() == diffView && m.diffModel.path == msg.path {
+			start, end := m.getCommitRange()
+			m.diff = gitDiff(start, end, m.diffModel.path)
+			m.diffModel.list.setCount(len(m.diff))
 		}
 	}
 
@@ -493,7 +391,7 @@ func (m appModel) View() string {
 
 	case diffView:
 		var lines []string
-		for i := m.diffModel.first; i < m.diffModel.last; i++ {
+		for i := m.diffModel.list.first; i < m.diffModel.list.last; i++ {
 			lines = append(lines, m.renderDiffLine(i))
 		}
 		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
@@ -507,22 +405,28 @@ func (m appModel) View() string {
 }
 
 func main() {
+	repoPath := os.Args[1]
+	os.Chdir(repoPath)
+
 	commits := gitLog()
 
 	m := appModel{
 		history: []view{commitsView},
 		commits: commits,
-		commitsList: listModel{
-			count:  len(commits),
-			marked: -1,
-		},
-		statsList: listModel{
-			marked: -1,
-		},
+		commitsList: newListModel(len(commits)),
+		statsList: newListModel(0),
 		status: "",
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
+
+	onNotify := func(event, path string) {
+		p.Send(filechange{path: path})
+	}
+
+	watcher := watchRepo(repoPath, onNotify)
+	defer watcher.Close()
+
 	if err := p.Start(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)

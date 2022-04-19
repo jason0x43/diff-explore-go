@@ -17,6 +17,39 @@ type commit struct {
 	Subject     string
 }
 
+func isIgnored(path string) bool {
+	err := exec.Command(
+		"git",
+		"check-ignore",
+		path,
+	).Run()
+
+	if err != nil {
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			if exiterr.ProcessState.ExitCode() == 1 {
+				return false
+			}
+			log.Fatal(err)
+		} else {
+			log.Fatal(err)
+		}
+	}
+
+	return true
+}
+
+func getGitDir() string {
+	out, err := exec.Command(
+		"git",
+		"rev-parse",
+		"--git-dir").Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return strings.TrimSpace(string(out))
+}
+
 func gitLog() []commit {
 	out, err := exec.Command(
 		"git",
@@ -32,6 +65,7 @@ func gitLog() []commit {
 			"  \"subject\": \"%f\"%n"+
 			"},",
 	).Output()
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,12 +83,17 @@ type stat struct {
 	Path   string
 }
 
-func gitDiffStat(a, b string) []stat {
+func gitDiffStat(start, end string) []stat {
+	commit := start
+	if end != "" {
+		commit += ".." + end
+	}
+
 	out, err := exec.Command(
 		"git",
 		"diff",
 		"--name-status",
-		a+".."+b,
+		commit,
 	).Output()
 	if err != nil {
 		log.Fatal(err)
@@ -74,12 +113,19 @@ func gitDiffStat(a, b string) []stat {
 	return stats
 }
 
-func gitDiff(a, b, path string) []string {
+func gitDiff(start, end, path string) []string {
+	commit := start
+	command := "diff-index"
+	if end != "" {
+		command = "diff-tree"
+		commit += ".." + end
+	}
+
 	out, err := exec.Command(
 		"git",
-		"diff-tree",
+		command,
 		"-p",
-		a+".."+b,
+		commit,
 		path,
 	).Output()
 	if err != nil {
