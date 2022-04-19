@@ -27,8 +27,9 @@ const (
 )
 
 type diffModel struct {
-	path string
-	list listModel
+	path    string
+	oldPath string
+	list    listModel
 }
 
 type appModel struct {
@@ -36,6 +37,7 @@ type appModel struct {
 	width        int
 	history      []view
 	watcherReady bool
+	repoPath     string
 
 	commits     []commit
 	commitsList listModel
@@ -177,10 +179,15 @@ func (m appModel) renderStat(index int) string {
 		markerStyle.UnsetBackground()
 	}
 
+	path := s.Path
+	if s.OldPath != "" {
+		path = path + " ← " + s.OldPath
+	}
+
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		markerStyle.Render(" "),
-		statStyle.Render(s.Path),
+		markerStyle.Render(string(s.Change[0])),
+		statStyle.Render(path),
 	)
 }
 
@@ -254,7 +261,7 @@ func (m appModel) getStatus() string {
 		path := m.stats[m.statsList.cursor].Path
 		return fmt.Sprintf("%s..%s: %s", trunc(start, 8), trunc(end, 8), path)
 	}
-	
+
 	return ""
 }
 
@@ -337,17 +344,21 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m = m.pushView(statsView)
 			} else if m.currentView() == statsView {
 				start, end := m.getCommitRange()
-				path := m.stats[m.statsList.cursor].Path
+				dm := m.stats[m.statsList.cursor]
 
-				absPath, err := filepath.Abs(path)
-				if err != nil {
-					absPath = path
+				absPath := filepath.Join(m.repoPath, dm.Path)
+
+				absOldPath := ""
+				if dm.OldPath != "" {
+					absOldPath = filepath.Join(m.repoPath, dm.OldPath)
 				}
 
-				m.diff = gitDiff(start, end, path)
+				m.diff = gitDiff(start, end, dm.Path, dm.OldPath)
+
 				m.diffModel = diffModel{
-					path: absPath,
-					list: newCursorlessListModel(len(m.diff)),
+					path:    absPath,
+					oldPath: absOldPath,
+					list:    newCursorlessListModel(len(m.diff)),
 				}
 				m.diffModel.list.setHeight(m.height)
 				m = m.pushView(diffView)
@@ -367,7 +378,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "filechange":
 			if m.currentView() == diffView && m.diffModel.path == msg.path {
 				start, end := m.getCommitRange()
-				m.diff = gitDiff(start, end, m.diffModel.path)
+				dm := m.diffModel
+				m.diff = gitDiff(start, end, dm.path, dm.oldPath)
 				m.diffModel.list.setCount(len(m.diff))
 			}
 		}
@@ -426,12 +438,16 @@ func (m appModel) View() string {
 }
 
 func main() {
-	repoPath := os.Args[1]
+	repoPath := "."
+	if len(os.Args) > 1 {
+		repoPath = os.Args[1]
+	}
 	os.Chdir(repoPath)
 
 	commits := gitLog()
 
 	m := appModel{
+		repoPath:    repoPath,
 		history:     []view{commitsView},
 		commits:     commits,
 		commitsList: newListModel(len(commits)),

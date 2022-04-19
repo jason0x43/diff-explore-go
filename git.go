@@ -79,8 +79,9 @@ func gitLog() []commit {
 }
 
 type stat struct {
-	Change rune
-	Path   string
+	Change  string
+	Path    string
+	OldPath string
 }
 
 func gitDiffStat(start, end string) []stat {
@@ -102,18 +103,34 @@ func gitDiffStat(start, end string) []stat {
 	var stats []stat
 
 	for _, line := range strings.Split(string(out), "\n") {
-		if len(line) > 0 {
-			s := stat{}
-			s.Change = rune(line[0])
-			s.Path = strings.TrimSpace(line[1:])
-			stats = append(stats, s)
+		if len(line) == 0 {
+			continue
 		}
+
+		s := stat{}
+		change, path, _ := strings.Cut(line, "\t")
+		if change == "" {
+			log.Fatal("No change for", line, "\n")
+		}
+
+		s.Change = change
+
+		path = strings.TrimSpace(path)
+
+		if change[0] == 'R' {
+			oldPath, newPath, _ := strings.Cut(path, "\t")
+			s.Path = strings.TrimSpace(newPath)
+			s.OldPath = strings.TrimSpace(oldPath)
+		} else {
+			s.Path = strings.TrimSpace(path)
+		}
+		stats = append(stats, s)
 	}
 
 	return stats
 }
 
-func gitDiff(start, end, path string) []string {
+func gitDiff(start, end, path, oldPath string) []string {
 	commit := start
 	command := "diff-index"
 	if end != "" {
@@ -121,13 +138,21 @@ func gitDiff(start, end, path string) []string {
 		commit += ".." + end
 	}
 
-	out, err := exec.Command(
+	args := []string{
 		"git",
 		command,
+		"-M",
 		"-p",
 		commit,
+		"--",
 		path,
-	).Output()
+	}
+
+	if oldPath != "" {
+		args = append(args, oldPath)
+	}
+
+	out, err := exec.Command(args[0], args[1:]...).Output()
 	if err != nil {
 		log.Fatal(err)
 	}
