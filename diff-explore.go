@@ -15,8 +15,9 @@ import (
 
 type view string
 
-type filechange struct {
-	path string
+type watcherMessage struct {
+	event string
+	path  string
 }
 
 const (
@@ -31,9 +32,10 @@ type diffModel struct {
 }
 
 type appModel struct {
-	height  int
-	width   int
-	history []view
+	height       int
+	width        int
+	history      []view
+	watcherReady bool
 
 	commits     []commit
 	commitsList listModel
@@ -252,7 +254,7 @@ func (m appModel) getStatus() string {
 		path := m.stats[m.statsList.cursor].Path
 		return fmt.Sprintf("%s..%s: %s", trunc(start, 8), trunc(end, 8), path)
 	}
-
+	
 	return ""
 }
 
@@ -265,7 +267,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		statusStyle.Width(m.width)
 
 		if m.currentView() == commitsView {
 			m.commitsList.setHeight(m.height)
@@ -359,11 +360,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.popView()
 		}
 
-	case filechange:
-		if m.currentView() == diffView && m.diffModel.path == msg.path {
-			start, end := m.getCommitRange()
-			m.diff = gitDiff(start, end, m.diffModel.path)
-			m.diffModel.list.setCount(len(m.diff))
+	case watcherMessage:
+		switch msg.event {
+		case "ready":
+			m.watcherReady = true
+		case "filechange":
+			if m.currentView() == diffView && m.diffModel.path == msg.path {
+				start, end := m.getCommitRange()
+				m.diff = gitDiff(start, end, m.diffModel.path)
+				m.diffModel.list.setCount(len(m.diff))
+			}
 		}
 	}
 
@@ -398,10 +404,24 @@ func (m appModel) View() string {
 		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
 	}
 
+	statusRightStyle.Width(5)
+	statusLeftStyle.Width(m.width - statusRightStyle.GetWidth())
+
+	statusRight := "-"
+	if m.watcherReady {
+		statusRight = "#"
+	}
+
+	status := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		statusLeftStyle.Render(m.status),
+		statusRightStyle.Render(statusRight),
+	)
+
 	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		lipgloss.PlaceVertical(m.height-1, lipgloss.Top, mainSection),
-		statusStyle.Render(m.status),
+		status,
 	)
 }
 
@@ -412,17 +432,21 @@ func main() {
 	commits := gitLog()
 
 	m := appModel{
-		history: []view{commitsView},
-		commits: commits,
+		history:     []view{commitsView},
+		commits:     commits,
 		commitsList: newListModel(len(commits)),
-		statsList: newListModel(0),
-		status: "",
+		statsList:   newListModel(0),
+		status:      "",
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	onNotify := func(event, path string) {
-		p.Send(filechange{path: path})
+		if event == "ready" {
+			p.Send(watcherMessage{event: "ready", path: ""})
+		} else {
+			p.Send(watcherMessage{event: "filechange", path: path})
+		}
 	}
 
 	watcher := watchRepo(repoPath, onNotify)

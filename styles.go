@@ -24,9 +24,15 @@ var tagStyle = lipgloss.NewStyle().
 var refStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("3"))
 var subjectStyle = lipgloss.NewStyle().Inline(true)
-var statusStyle = lipgloss.NewStyle().
+var statusLeftStyle = lipgloss.NewStyle().
 	Inline(true).
 	Background(lipgloss.Color("8")).
+	Foreground(lipgloss.Color("15"))
+var statusRightStyle = lipgloss.NewStyle().
+	Inline(true).
+	Width(5).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("4")).
 	Foreground(lipgloss.Color("15"))
 var statStyle = lipgloss.NewStyle().Inline(true)
 var diffNormalStyle = lipgloss.NewStyle().
@@ -43,11 +49,3 @@ var diffModStyle = lipgloss.NewStyle().
 var diffSepStyle = lipgloss.NewStyle().
 	Inline(true).
 	Foreground(lipgloss.Color("6"))
-var popupStyle = lipgloss.NewStyle().
-	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("13")).
-	Padding(1, 0).
-	BorderTop(true).
-	BorderLeft(true).
-	BorderRight(true).
-	BorderBottom(true)

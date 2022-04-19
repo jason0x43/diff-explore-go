@@ -11,22 +11,6 @@ import (
 
 type notifyFunc func(string, string)
 
-// func debounce(interval time.Duration, input chan string, cb func(arg string)) {
-// 	var value string
-// 	timer := time.NewTimer(interval)
-
-// 	for {
-// 		select {
-// 		case value = <-input:
-// 			timer.Reset(interval)
-// 		case <-timer.C:
-// 			if value != "" {
-// 				cb(value)
-// 			}
-// 		}
-// 	}
-// }
-
 func watchRepo(path string, notify notifyFunc) *fsnotify.Watcher {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -35,25 +19,27 @@ func watchRepo(path string, notify notifyFunc) *fsnotify.Watcher {
 
 	gitDir := filepath.Join(path, getGitDir())
 
-	err = filepath.WalkDir(
-		path,
-		func(path string, d fs.DirEntry, err error) error {
-			if d.IsDir() {
-				if isIgnored(path) || path == gitDir {
-					return fs.SkipDir
-				}
-
-				return watcher.Add(path)
-			}
-			return nil
-		},
-	)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	go func() {
+		err = filepath.WalkDir(
+			path,
+			func(path string, d fs.DirEntry, err error) error {
+				if d.IsDir() {
+					if isIgnored(path) || path == gitDir {
+						return fs.SkipDir
+					}
+
+					return watcher.Add(path)
+				}
+				return nil
+			},
+		)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		notify("ready", "")
+
 		for {
 			select {
 			case event, ok := <-watcher.Events:
@@ -61,7 +47,11 @@ func watchRepo(path string, notify notifyFunc) *fsnotify.Watcher {
 					return
 				}
 				if !isIgnored(event.Name) {
-					notify(fmt.Sprintf("%d", event.Op), event.Name)
+					absPath, err := filepath.Abs(event.Name)
+					if err != nil {
+						absPath = path
+					}
+					notify(fmt.Sprintf("%d", event.Op), absPath)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
