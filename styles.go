@@ -33,7 +33,7 @@ var statusRightStyle = lipgloss.NewStyle().
 	Width(5).
 	Align(lipgloss.Center).
 	Background(lipgloss.Color("4")).
-	Foreground(lipgloss.Color("15"))
+	Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"})
 var statStyle = lipgloss.NewStyle().Inline(true)
 var diffNormalStyle = lipgloss.NewStyle().
 	Inline(true)
