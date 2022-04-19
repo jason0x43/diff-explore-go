@@ -21,6 +21,7 @@ func isIgnored(path string) bool {
 	err := exec.Command(
 		"git",
 		"check-ignore",
+		"-q",
 		path,
 	).Run()
 
