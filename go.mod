@@ -1,4 +1,4 @@
-module diff-explore
+module de
 
 go 1.18
 
