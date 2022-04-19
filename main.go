@@ -3,9 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	// "os"
 	"strings"
 	"time"
 
@@ -37,7 +35,6 @@ type appModel struct {
 	width        int
 	history      []view
 	watcherReady bool
-	repoPath     string
 
 	commits     []commit
 	commitsList listModel
@@ -315,7 +312,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.diffModel.list.prevPage()
 			}
 
-		case "j":
+		case "j", "down":
 			if m.currentView() == commitsView {
 				m.commitsList.nextItem()
 			} else if m.currentView() == statsView {
@@ -324,7 +321,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.diffModel.list.nextItem()
 			}
 
-		case "k":
+		case "k", "up":
 			if m.currentView() == commitsView {
 				m.commitsList.prevItem()
 			} else if m.currentView() == statsView {
@@ -346,18 +343,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				start, end := m.getCommitRange()
 				dm := m.stats[m.statsList.cursor]
 
-				absPath := filepath.Join(m.repoPath, dm.Path)
-
-				absOldPath := ""
-				if dm.OldPath != "" {
-					absOldPath = filepath.Join(m.repoPath, dm.OldPath)
-				}
-
 				m.diff = gitDiff(start, end, dm.Path, dm.OldPath)
 
 				m.diffModel = diffModel{
-					path:    absPath,
-					oldPath: absOldPath,
+					path:    dm.Path,
+					oldPath: dm.OldPath,
 					list:    newCursorlessListModel(len(m.diff)),
 				}
 				m.diffModel.list.setHeight(m.height)
@@ -447,7 +437,6 @@ func main() {
 	commits := gitLog()
 
 	m := appModel{
-		repoPath:    repoPath,
 		history:     []view{commitsView},
 		commits:     commits,
 		commitsList: newListModel(len(commits)),
@@ -464,8 +453,7 @@ func main() {
 			p.Send(watcherMessage{event: "filechange", path: path})
 		}
 	}
-
-	watcher := watchRepo(repoPath, onNotify)
+	watcher := watchRepo(".", onNotify)
 	defer watcher.Close()
 
 	if err := p.Start(); err != nil {

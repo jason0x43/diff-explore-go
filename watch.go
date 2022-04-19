@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/fs"
 	"log"
 	"path/filepath"
@@ -10,6 +9,19 @@ import (
 )
 
 type notifyFunc func(string, string)
+
+func getOpType(op fsnotify.Op) string {
+	if op&fsnotify.Write == fsnotify.Write {
+		return "modify"
+	}
+	if op&fsnotify.Create == fsnotify.Write {
+		return "add"
+	}
+	if op&fsnotify.Remove == fsnotify.Write {
+		return "remove"
+	}
+	return ""
+}
 
 func watchRepo(path string, notify notifyFunc) *fsnotify.Watcher {
 	watcher, err := fsnotify.NewWatcher()
@@ -47,11 +59,10 @@ func watchRepo(path string, notify notifyFunc) *fsnotify.Watcher {
 					return
 				}
 				if !isIgnored(event.Name) {
-					absPath, err := filepath.Abs(event.Name)
-					if err != nil {
-						absPath = path
+					opType := getOpType(event.Op)
+					if opType != "" {
+						notify(opType, event.Name)
 					}
-					notify(fmt.Sprintf("%d", event.Op), absPath)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
