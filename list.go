@@ -56,39 +56,43 @@ func (m *listModel) setCount(count int) {
 func (m *listModel) nextPage() {
 	if m.cursor != -1 {
 		m.cursor += m.height
-	}
-
-	m.first += m.height
-	m.last += m.height
-	if m.last >= m.count {
-		m.last = m.count - 1
-		m.first = m.last - m.height + 1
-	}
-
-	if m.cursor != -1 {
-		if m.cursor > m.last {
-			m.cursor = m.last
+		if m.cursor >= m.count {
+			m.cursor = m.count - 1
 		}
 	}
+
+	if m.last == m.count {
+		return
+	}
+
+	delta := m.height
+	if m.last + m.height >= m.count {
+		delta = m.count - m.last
+	}
+
+	m.last += delta
+	m.first += delta
 }
 
 func (m *listModel) prevPage() {
 	if m.cursor != -1 {
 		m.cursor -= m.height
-	}
-
-	m.first -= m.height
-	m.last -= m.height
-	if m.first < 0 {
-		m.first = 0
-		m.last = m.first + m.height - 1
-	}
-
-	if m.cursor != -1 {
 		if m.cursor < 0 {
 			m.cursor = 0
 		}
 	}
+
+	if m.first == 0 {
+		return
+	}
+
+	delta := m.height
+	if m.first - m.height < 0 {
+		delta = m.first
+	}
+
+	m.first -= delta
+	m.last -= delta
 }
 
 func (m *listModel) nextItem() {
