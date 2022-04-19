@@ -29,13 +29,19 @@ var statusStyle = lipgloss.NewStyle().
 	Background(lipgloss.Color("8")).
 	Foreground(lipgloss.Color("15"))
 var statStyle = lipgloss.NewStyle().Inline(true)
+var diffNormalStyle = lipgloss.NewStyle().
+	Inline(true)
 var diffAddStyle = lipgloss.NewStyle().
+	Inline(true).
 	Foreground(lipgloss.Color("2"))
 var diffDelStyle = lipgloss.NewStyle().
+	Inline(true).
 	Foreground(lipgloss.Color("1"))
 var diffModStyle = lipgloss.NewStyle().
+	Inline(true).
 	Foreground(lipgloss.Color("18"))
 var diffSepStyle = lipgloss.NewStyle().
+	Inline(true).
 	Foreground(lipgloss.Color("6"))
 var popupStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).

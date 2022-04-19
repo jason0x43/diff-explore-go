@@ -184,6 +184,7 @@ func (m appModel) renderStat(index int) string {
 
 func (m appModel) renderDiffLine(index int) string {
 	d := m.diff[index]
+	d = strings.ReplaceAll(d, "\t", "    ")
 
 	if len(d) > 0 {
 		switch d[0] {
@@ -196,7 +197,7 @@ func (m appModel) renderDiffLine(index int) string {
 		}
 	}
 
-	return d
+	return diffNormalStyle.Render(d)
 }
 
 func (m appModel) currentView() view {
