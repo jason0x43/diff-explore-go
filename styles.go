@@ -2,7 +2,13 @@ package main
 
 import "github.com/charmbracelet/lipgloss"
 
+// colors
 var cursorBg = lipgloss.Color("0")
+var addFg = lipgloss.Color("2")
+var remFg = lipgloss.Color("1")
+var modFg = lipgloss.Color("18")
+
+// styles
 var markerStyle = lipgloss.NewStyle().Width(2)
 var hashStyle = lipgloss.NewStyle().
 	Width(9).
@@ -35,17 +41,29 @@ var statusRightStyle = lipgloss.NewStyle().
 	Background(lipgloss.Color("4")).
 	Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"})
 var statStyle = lipgloss.NewStyle().Inline(true)
+var statAddStyle = lipgloss.NewStyle().
+	Inline(true).
+	Width(2).
+	Foreground(addFg)
+var statRemStyle = lipgloss.NewStyle().
+	Inline(true).
+	Width(2).
+	Foreground(remFg)
+var statModStyle = lipgloss.NewStyle().
+	Inline(true).
+	Width(2).
+	Foreground(modFg)
 var diffNormalStyle = lipgloss.NewStyle().
 	Inline(true)
 var diffAddStyle = lipgloss.NewStyle().
 	Inline(true).
-	Foreground(lipgloss.Color("2"))
-var diffDelStyle = lipgloss.NewStyle().
+	Foreground(addFg)
+var diffRemStyle = lipgloss.NewStyle().
 	Inline(true).
-	Foreground(lipgloss.Color("1"))
+	Foreground(remFg)
 var diffModStyle = lipgloss.NewStyle().
 	Inline(true).
-	Foreground(lipgloss.Color("18"))
+	Foreground(modFg)
 var diffSepStyle = lipgloss.NewStyle().
 	Inline(true).
 	Foreground(lipgloss.Color("6"))

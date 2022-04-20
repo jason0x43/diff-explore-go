@@ -168,12 +168,19 @@ func (m appModel) renderStat(index int) string {
 
 	statStyle.Width(m.width)
 
+	statTypeStyle := statModStyle
+	if (s.Change[0] == 'A') {
+		statTypeStyle = statAddStyle
+	} else if (s.Change[0] == 'D') {
+		statTypeStyle = statRemStyle
+	}
+
 	if index == m.statsList.cursor {
 		statStyle.Background(cursorBg)
-		markerStyle.Background(cursorBg)
+		statTypeStyle.Background(cursorBg)
 	} else {
 		statStyle.UnsetBackground()
-		markerStyle.UnsetBackground()
+		statTypeStyle.UnsetBackground()
 	}
 
 	path := s.Path
@@ -183,7 +190,7 @@ func (m appModel) renderStat(index int) string {
 
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		markerStyle.Render(string(s.Change[0])),
+		statTypeStyle.Render(string(s.Change[0])),
 		statStyle.Render(path),
 	)
 }
@@ -195,7 +202,7 @@ func (m appModel) renderDiffLine(index int) string {
 	if len(d) > 0 {
 		switch d[0] {
 		case '-':
-			return diffDelStyle.Render(d)
+			return diffRemStyle.Render(d)
 		case '+':
 			return diffAddStyle.Render(d)
 		case '@':
