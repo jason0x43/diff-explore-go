@@ -143,6 +143,7 @@ func gitDiff(start, end, path, oldPath string) []string {
 		"git",
 		command,
 		"-M",
+		"--patience",
 		"-p",
 		commit,
 		"--",
