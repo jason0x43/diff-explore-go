@@ -44,6 +44,7 @@ type appModel struct {
 
 	diff      []string
 	diffModel diffModel
+	diffOpts  diffOptions
 
 	status string
 }
@@ -343,15 +344,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.stats = gitDiffStat(start, end)
 				m.statsList = listModel{
 					count:  len(m.stats),
-					marked: -1}
+					marked: -1,
+				}
 				m.statsList.setHeight(m.height)
 				m = m.pushView(statsView)
 			} else if m.currentView() == statsView {
 				start, end := m.getCommitRange()
 				dm := m.stats[m.statsList.cursor]
 
-				m.diff = gitDiff(start, end, dm.Path, dm.OldPath)
-
+				m.diff = gitDiff(start, end, dm.Path, dm.OldPath, m.diffOpts)
 				m.diffModel = diffModel{
 					path:    dm.Path,
 					oldPath: dm.OldPath,
@@ -366,6 +367,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 			m = m.popView()
+
+		case "w":
+			if m.currentView() == diffView {
+				m.diffOpts.ignoreWhitespace = !m.diffOpts.ignoreWhitespace
+				start, end := m.getCommitRange()
+				dm := m.diffModel
+				m.diff = gitDiff(start, end, dm.path, dm.oldPath, m.diffOpts)
+				m.diffModel.list.setCount(len(m.diff))
+			}
 		}
 
 	case watcherMessage:
@@ -373,12 +383,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ready":
 			m.watcherReady = true
 		case "filechange":
+			start, end := m.getCommitRange()
 			if m.currentView() == diffView && m.diffModel.path == msg.path {
-				start, end := m.getCommitRange()
 				dm := m.diffModel
-				m.diff = gitDiff(start, end, dm.path, dm.oldPath)
+				m.diff = gitDiff(start, end, dm.path, dm.oldPath, m.diffOpts)
 				m.diffModel.list.setCount(len(m.diff))
 			}
+
+			m.stats = gitDiffStat(start, end)
+			m.statsList.setCount(len(m.stats))
 		}
 	}
 
@@ -416,9 +429,14 @@ func (m appModel) View() string {
 	statusRightStyle.Width(5)
 	statusLeftStyle.Width(m.width - statusRightStyle.GetWidth())
 
-	statusRight := "-"
-	if m.watcherReady {
-		statusRight = "#"
+	statusRight := ""
+	if !m.watcherReady {
+		// TODO use a spinner for this
+		statusRight += "-"
+	}
+
+	if m.diffOpts.ignoreWhitespace {
+		statusRight += "W"
 	}
 
 	status := lipgloss.JoinHorizontal(

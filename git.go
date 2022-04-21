@@ -131,7 +131,11 @@ func gitDiffStat(start, end string) []stat {
 	return stats
 }
 
-func gitDiff(start, end, path, oldPath string) []string {
+type diffOptions struct {
+	ignoreWhitespace bool
+}
+
+func gitDiff(start, end, path, oldPath string, options diffOptions) []string {
 	commit := start
 	command := "diff-index"
 	if end != "" {
@@ -145,10 +149,13 @@ func gitDiff(start, end, path, oldPath string) []string {
 		"-M",
 		"--patience",
 		"-p",
-		commit,
-		"--",
-		path,
 	}
+
+	if options.ignoreWhitespace {
+		args = append(args, "-w")
+	}
+
+	args = append(args, commit, "--", path)
 
 	if oldPath != "" {
 		args = append(args, oldPath)
