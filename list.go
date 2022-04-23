@@ -144,3 +144,22 @@ func (m *listModel) mark() {
 		m.marked = m.cursor
 	}
 }
+
+func (m *listModel) setCursor(index int) {
+	m.cursor = index
+	if m.cursor > m.last-1 {
+		m.last = m.cursor + 1
+		m.first = max(m.last - m.height + 1, 0)
+	} else if m.cursor < m.first {
+		m.first = m.cursor
+		m.last = min(m.first + m.height, m.count) - 1
+	}
+}
+
+func (m *listModel) scrollToBottom() {
+	m.setCursor(m.count - 1)
+}
+
+func (m *listModel) scrollToTop() {
+	m.setCursor(0)
+}

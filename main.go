@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -13,11 +14,35 @@ type watcherMessage struct {
 	path  string
 }
 
+type chord struct {
+	key       string
+	startTime time.Time
+}
+
+func (c chord) isExpired() bool {
+	now := time.Now()
+	return now.Sub(c.startTime).Milliseconds() > 1000
+}
+
+func (c *chord) start(key string) {
+	c.startTime = time.Now()
+	c.key = key
+}
+
+func (c chord) getKey() string {
+	if c.isExpired() {
+		return ""
+	}
+	return c.key
+}
+
 type appModel struct {
 	height       int
 	width        int
 	history      []string
 	watcherReady bool
+
+	chord chord
 
 	commits commitsModel
 	stats   statsModel
@@ -86,6 +111,30 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case " ":
 			if m.currentView() == "commits" {
 				m.commits.mark()
+			}
+
+		case "1":
+			m.chord.start("1")
+
+		case "G":
+			if m.chord.getKey() == "1" {
+				switch m.currentView() {
+				case "commits":
+					m.commits.scrollToTop()
+				case "stats":
+					m.stats.scrollToTop()
+				case "diff":
+					m.diff.scrollToTop()
+				}
+			} else {
+				switch m.currentView() {
+				case "commits":
+					m.commits.scrollToBottom()
+				case "stats":
+					m.stats.scrollToBottom()
+				case "diff":
+					m.diff.scrollToBottom()
+				}
 			}
 
 		case "ctrl+f":
@@ -189,6 +238,9 @@ func (m appModel) View() string {
 		// TODO use a spinner for this
 		statusRight += "-"
 	}
+	if !m.chord.isExpired() && m.chord.key != "" {
+		statusRight += m.chord.key
+	}
 
 	if m.diff.opts.ignoreWhitespace {
 		statusRight += "W"
@@ -241,3 +293,4 @@ func main() {
 		os.Exit(1)
 	}
 }
+
