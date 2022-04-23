@@ -21,7 +21,7 @@ type commitsModel struct {
 func newCommitsModel() commitsModel {
 	commits := gitLog()
 	m := commitsModel{commits: commits}
-	m.listModel.init(len(commits), true)
+	m.listModel.init(len(commits), false)
 	return m
 }
 

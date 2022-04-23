@@ -174,9 +174,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.stats.setSize(m.width, m.height)
 				m.pushView("stats")
 			} else if m.currentViewName() == m.stats.name() {
-				m.diff.setDiff(m.commits.getRange(), m.stats.selected())
-				m.diff.setSize(m.width, m.height)
-				m.pushView("diff")
+				if m.stats.cursor >= 0 {
+					m.diff.setDiff(m.commits.getRange(), m.stats.selected())
+					m.diff.setSize(m.width, m.height)
+					m.pushView("diff")
+				}
 			}
 
 		case "esc", "q":

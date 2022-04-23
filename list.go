@@ -2,11 +2,12 @@ package main
 
 type listModel struct {
 	viewModel
-	count  int
-	first  int
-	last   int
-	cursor int
-	marked int
+	count      int
+	first      int
+	last       int
+	marked     int
+	cursor     int
+	scrollLock bool
 }
 
 type listView interface {
@@ -21,10 +22,11 @@ type listView interface {
 	scrollToBottom()
 }
 
-func (m *listModel) init(count int, cursor bool) {
+func (m *listModel) init(count int, scrollLock bool) {
 	m.count = count
 	m.marked = -1
-	if cursor {
+	m.scrollLock = scrollLock
+	if count > 0 {
 		m.cursor = 0
 	} else {
 		m.cursor = -1
@@ -65,7 +67,7 @@ func (m *listModel) setCount(count int) {
 }
 
 func (m *listModel) nextPage() {
-	if m.cursor != -1 {
+	if !m.scrollLock {
 		m.cursor += m.height
 		if m.cursor >= m.count {
 			m.cursor = m.count - 1
@@ -86,7 +88,7 @@ func (m *listModel) nextPage() {
 }
 
 func (m *listModel) prevPage() {
-	if m.cursor != -1 {
+	if !m.scrollLock {
 		m.cursor -= m.height
 		if m.cursor < 0 {
 			m.cursor = 0
@@ -107,7 +109,7 @@ func (m *listModel) prevPage() {
 }
 
 func (m *listModel) nextItem() {
-	if m.cursor == -1 {
+	if m.scrollLock {
 		// Not using cursor
 		if m.last < m.count-1 {
 			m.first += 1
@@ -123,7 +125,7 @@ func (m *listModel) nextItem() {
 }
 
 func (m *listModel) prevItem() {
-	if m.cursor == -1 {
+	if m.scrollLock {
 		// Not using cursor
 		if m.first > 0 {
 			m.first -= 1
@@ -147,13 +149,17 @@ func (m *listModel) mark() {
 }
 
 func (m *listModel) setCursor(index int) {
-	m.cursor = index
-	if m.cursor > m.last-1 {
-		m.last = m.cursor + 1
-		m.first = max(m.last - m.height + 1, 0)
-	} else if m.cursor < m.first {
-		m.first = m.cursor
-		m.last = min(m.first + m.height, m.count) - 1
+	if m.count == 0 {
+		m.cursor = -1
+	} else {
+		m.cursor = index
+		if m.cursor > m.last-1 {
+			m.last = m.cursor + 1
+			m.first = max(m.last-m.height+1, 0)
+		} else if m.cursor < m.first {
+			m.first = m.cursor
+			m.last = min(m.first+m.height, m.count) - 1
+		}
 	}
 }
 

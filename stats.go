@@ -29,7 +29,7 @@ func (m statsModel) selected() stat {
 func (m *statsModel) setDiff(c commitRange) {
 	m.commits = c
 	m.stats = gitDiffStat(c.start, c.end)
-	m.listModel.init(len(m.stats), true)
+	m.listModel.init(len(m.stats), false)
 }
 
 func (m *statsModel) refresh() {
