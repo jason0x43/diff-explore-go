@@ -26,10 +26,14 @@ func (m diffModel) name() string {
 }
 
 func (m *diffModel) setDiff(c commitRange, s stat) {
-	m.diff = gitDiff(c.start, c.end, s.Path, s.OldPath, m.opts)
+	m.commits = c
+	m.setDiffStat(s)
+}
+
+func (m *diffModel) setDiffStat(s stat) {
 	m.path = s.Path
 	m.oldPath = s.OldPath
-	m.listModel.init(len(m.diff), false)
+	m.refresh()
 }
 
 func (m *diffModel) refresh() {

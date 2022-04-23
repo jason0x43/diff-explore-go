@@ -151,9 +151,21 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				c.nextItem()
 			}
 
+		case "J":
+			if m.currentView().name() == m.diff.name() {
+				m.stats.nextItem()
+				m.diff.setDiffStat(m.stats.selected())
+			}
+
 		case "k", "up":
 			if c := m.currentView(); c != nil {
 				c.prevItem()
+			}
+
+		case "K":
+			if m.currentView().name() == m.diff.name() {
+				m.stats.prevItem()
+				m.diff.setDiffStat(m.stats.selected())
 			}
 
 		case "enter":
