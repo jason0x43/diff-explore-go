@@ -66,3 +66,25 @@ func (m diffModel) render() string {
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
+
+func (m *diffModel) findNext(query string) {
+	q := strings.ToLower(query)
+	for i := m.cursor + 1; i < m.count; i++ {
+		c := strings.ToLower(m.renderDiffLine(i))
+		if strings.Contains(c, q) {
+			m.cursor = i
+			break
+		}
+	}
+}
+
+func (m *diffModel) findPrev(query string) {
+	q := strings.ToLower(query)
+	for i := m.cursor - 1; i >= 0; i++ {
+		c := strings.ToLower(m.renderDiffLine(i))
+		if strings.Contains(c, q) {
+			m.cursor = i
+			break
+		}
+	}
+}

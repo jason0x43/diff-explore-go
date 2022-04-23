@@ -20,6 +20,8 @@ type listView interface {
 	setCursor(int)
 	scrollToTop()
 	scrollToBottom()
+	findNext(string)
+	findPrev(string)
 }
 
 func (m *listModel) init(count int, scrollLock bool) {

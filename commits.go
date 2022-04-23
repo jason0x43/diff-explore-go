@@ -176,3 +176,25 @@ func (m commitsModel) getRangeStr() string {
 	}
 	return fmt.Sprintf("%s..%s", trunc(r.start, 8), trunc(r.end, 8))
 }
+
+func (m *commitsModel) findNext(query string) {
+	q := strings.ToLower(query)
+	for i := m.cursor + 1; i < m.count; i++ {
+		c := strings.ToLower(m.renderCommit(i))
+		if strings.Contains(c, q) {
+			m.setCursor(i)
+			break
+		}
+	}
+}
+
+func (m *commitsModel) findPrev(query string) {
+	q := strings.ToLower(query)
+	for i := m.cursor - 1; i >= 0; i-- {
+		c := strings.ToLower(m.renderCommit(i))
+		if strings.Contains(c, q) {
+			m.setCursor(i)
+			break
+		}
+	}
+}

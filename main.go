@@ -42,6 +42,9 @@ type appModel struct {
 	history      []string
 	watcherReady bool
 
+	searching bool
+	query     string
+
 	chord chord
 
 	commits commitsModel
@@ -87,15 +90,19 @@ func (m *appModel) popView() {
 }
 
 func (m appModel) getStatus() string {
-	switch m.currentView().name() {
-	case m.commits.name():
-		return m.commits.getRangeStr()
-	case m.stats.name():
-		return m.commits.getRangeStr()
-	case m.diff.name():
-		r := m.commits.getRangeStr()
-		path := m.stats.stat(m.stats.cursor).Path
-		return fmt.Sprintf("%s: %s", r, path)
+	if m.searching {
+		return fmt.Sprintf("search: %s", m.query)
+	} else {
+		switch m.currentView().name() {
+		case m.commits.name():
+			return m.commits.getRangeStr()
+		case m.stats.name():
+			return m.commits.getRangeStr()
+		case m.diff.name():
+			r := m.commits.getRangeStr()
+			path := m.stats.stat(m.stats.cursor).Path
+			return fmt.Sprintf("%s: %s", r, path)
+		}
 	}
 
 	return ""
@@ -115,82 +122,116 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
-			return m, tea.Quit
-
-		case " ":
-			if c := m.currentView(); c != nil {
-				c.mark()
-			}
-
-		case "1":
-			m.chord.start("1")
-
-		case "G":
-			if c := m.currentView(); c != nil {
-				if m.chord.getKey() == "1" {
-					c.scrollToTop()
-				} else {
-					c.scrollToBottom()
+		if m.searching {
+			switch msg.String() {
+			case "esc":
+				m.searching = false
+			case "backspace":
+				if len(m.query) > 0 {
+					m.query = m.query[0:len(m.query) - 1]
 				}
-			}
-
-		case "ctrl+f":
-			if c := m.currentView(); c != nil {
-				c.nextPage()
-			}
-
-		case "ctrl+u":
-			if c := m.currentView(); c != nil {
-				c.prevPage()
-			}
-
-		case "j", "down":
-			if c := m.currentView(); c != nil {
-				c.nextItem()
-			}
-
-		case "J":
-			if m.currentView().name() == m.diff.name() {
-				m.stats.nextItem()
-				m.diff.setDiffStat(m.stats.selected())
-			}
-
-		case "k", "up":
-			if c := m.currentView(); c != nil {
-				c.prevItem()
-			}
-
-		case "K":
-			if m.currentView().name() == m.diff.name() {
-				m.stats.prevItem()
-				m.diff.setDiffStat(m.stats.selected())
-			}
-
-		case "enter":
-			if m.currentViewName() == m.commits.name() {
-				m.stats.setDiff(m.commits.getRange())
-				m.stats.setSize(m.width, m.height)
-				m.pushView("stats")
-			} else if m.currentViewName() == m.stats.name() {
-				if m.stats.cursor >= 0 {
-					m.diff.setDiff(m.commits.getRange(), m.stats.selected())
-					m.diff.setSize(m.width, m.height)
-					m.pushView("diff")
-				}
-			}
-
-		case "esc", "q":
-			if len(m.history) == 1 {
+			case "enter":
+				m.searching = false
+				m.currentView().findNext(m.query)
+			case "ctrl+c":
 				return m, tea.Quit
+			default:
+				if msg.Type == tea.KeyRunes {
+					m.query += msg.String()
+				}
 			}
-			m.popView()
+		} else {
+			switch msg.String() {
+			case "ctrl+c":
+				return m, tea.Quit
 
-		case "w":
-			if c := m.currentView(); c != nil && c.name() == "diff" {
-				m.diff.opts.ignoreWhitespace = !m.diff.opts.ignoreWhitespace
-				m.diff.refresh()
+			case " ":
+				if c := m.currentView(); c != nil {
+					c.mark()
+				}
+
+			case "/":
+				m.searching = true
+				m.query = ""
+
+			case "1":
+				m.chord.start("1")
+
+			case "G":
+				if c := m.currentView(); c != nil {
+					if m.chord.getKey() == "1" {
+						c.scrollToTop()
+					} else {
+						c.scrollToBottom()
+					}
+				}
+
+			case "ctrl+f":
+				if c := m.currentView(); c != nil {
+					c.nextPage()
+				}
+
+			case "ctrl+u":
+				if c := m.currentView(); c != nil {
+					c.prevPage()
+				}
+
+			case "j", "down":
+				if c := m.currentView(); c != nil {
+					c.nextItem()
+				}
+
+			case "J":
+				if m.currentView().name() == m.diff.name() {
+					m.stats.nextItem()
+					m.diff.setDiffStat(m.stats.selected())
+				}
+
+			case "k", "up":
+				if c := m.currentView(); c != nil {
+					c.prevItem()
+				}
+
+			case "K":
+				if m.currentView().name() == m.diff.name() {
+					m.stats.prevItem()
+					m.diff.setDiffStat(m.stats.selected())
+				}
+
+			case "n":
+				if len(m.query) > 0 {
+					m.currentView().findNext(m.query)
+				}
+
+			case "N":
+				if len(m.query) > 0 {
+					m.currentView().findPrev(m.query)
+				}
+
+			case "enter":
+				if m.currentViewName() == m.commits.name() {
+					m.stats.setDiff(m.commits.getRange())
+					m.stats.setSize(m.width, m.height)
+					m.pushView("stats")
+				} else if m.currentViewName() == m.stats.name() {
+					if m.stats.cursor >= 0 {
+						m.diff.setDiff(m.commits.getRange(), m.stats.selected())
+						m.diff.setSize(m.width, m.height)
+						m.pushView("diff")
+					}
+				}
+
+			case "esc", "q":
+				if len(m.history) == 1 {
+					return m, tea.Quit
+				}
+				m.popView()
+
+			case "w":
+				if c := m.currentView(); c != nil && c.name() == "diff" {
+					m.diff.opts.ignoreWhitespace = !m.diff.opts.ignoreWhitespace
+					m.diff.refresh()
+				}
 			}
 		}
 
