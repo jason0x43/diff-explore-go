@@ -10,14 +10,15 @@ type listModel struct {
 }
 
 type listView interface {
+	view
 	nextPage()
 	prevPage()
 	nextItem()
 	prevItem()
-	cursor()
+	mark()
 	setCursor(int)
-	marker()
-	setMarker(int)
+	scrollToTop()
+	scrollToBottom()
 }
 
 func (m *listModel) init(count int, cursor bool) {

@@ -18,7 +18,8 @@ type commitsModel struct {
 	commits []commit
 }
 
-func newCommitsModel(commits []commit) commitsModel {
+func newCommitsModel() commitsModel {
+	commits := gitLog()
 	m := commitsModel{commits: commits}
 	m.listModel.init(len(commits), true)
 	return m

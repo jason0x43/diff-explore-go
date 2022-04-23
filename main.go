@@ -58,8 +58,24 @@ func trunc(s string, size int) string {
 	return s
 }
 
-func (m appModel) currentView() string {
-	return m.history[len(m.history)-1]
+func (m *appModel) currentView() listView {
+	v := m.history[len(m.history)-1]
+	switch v {
+	case m.commits.name():
+		return &m.commits
+	case m.stats.name():
+		return &m.stats
+	case m.diff.name():
+		return &m.diff
+	}
+	return nil
+}
+
+func (m appModel) currentViewName() string {
+	if c := m.currentView(); c != nil {
+		return c.name()
+	}
+	return ""
 }
 
 func (m *appModel) pushView(view string) {
@@ -71,7 +87,7 @@ func (m *appModel) popView() {
 }
 
 func (m appModel) getStatus() string {
-	switch m.currentView() {
+	switch m.currentView().name() {
 	case m.commits.name():
 		return m.commits.getRangeStr()
 	case m.stats.name():
@@ -94,13 +110,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		switch m.currentView() {
-		case "commits":
-			m.commits.setSize(msg.Width, msg.Height)
-		case "stats":
-			m.stats.setSize(msg.Width, msg.Height)
-		case "diff":
-			m.diff.setSize(msg.Width, msg.Height)
+		if v := m.currentView(); v != nil {
+			v.setSize(msg.Width, msg.Height)
 		}
 
 	case tea.KeyMsg:
@@ -109,80 +120,48 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case " ":
-			if m.currentView() == "commits" {
-				m.commits.mark()
+			if c := m.currentView(); c != nil {
+				c.mark()
 			}
 
 		case "1":
 			m.chord.start("1")
 
 		case "G":
-			if m.chord.getKey() == "1" {
-				switch m.currentView() {
-				case "commits":
-					m.commits.scrollToTop()
-				case "stats":
-					m.stats.scrollToTop()
-				case "diff":
-					m.diff.scrollToTop()
-				}
-			} else {
-				switch m.currentView() {
-				case "commits":
-					m.commits.scrollToBottom()
-				case "stats":
-					m.stats.scrollToBottom()
-				case "diff":
-					m.diff.scrollToBottom()
+			if c := m.currentView(); c != nil {
+				if m.chord.getKey() == "1" {
+					c.scrollToTop()
+				} else {
+					c.scrollToBottom()
 				}
 			}
 
 		case "ctrl+f":
-			switch m.currentView() {
-			case "commits":
-				m.commits.nextPage()
-			case "stats":
-				m.stats.nextPage()
-			case "diff":
-				m.diff.nextPage()
+			if c := m.currentView(); c != nil {
+				c.nextPage()
 			}
 
 		case "ctrl+u":
-			switch m.currentView() {
-			case "commits":
-				m.commits.prevPage()
-			case "stats":
-				m.stats.prevPage()
-			case "diff":
-				m.diff.prevPage()
+			if c := m.currentView(); c != nil {
+				c.prevPage()
 			}
 
 		case "j", "down":
-			switch m.currentView() {
-			case "commits":
-				m.commits.nextItem()
-			case "stats":
-				m.stats.nextItem()
-			case "diff":
-				m.diff.nextItem()
+			if c := m.currentView(); c != nil {
+				c.nextItem()
 			}
 
 		case "k", "up":
-			switch m.currentView() {
-			case "commits":
-				m.commits.prevItem()
-			case "stats":
-				m.stats.prevItem()
-			case "diff":
-				m.diff.prevItem()
+			if c := m.currentView(); c != nil {
+				c.prevItem()
 			}
 
 		case "enter":
-			if m.currentView() == "commits" {
+			if m.currentViewName() == m.commits.name() {
 				m.stats.setDiff(m.commits.getRange())
 				m.stats.setSize(m.width, m.height)
 				m.pushView("stats")
-			} else if m.currentView() == "stats" {
+			} else if m.currentViewName() == m.stats.name() {
 				m.diff.setDiff(m.commits.getRange(), m.stats.selected())
 				m.diff.setSize(m.width, m.height)
 				m.pushView("diff")
@@ -195,7 +174,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.popView()
 
 		case "w":
-			if m.currentView() == "diff" {
+			if c := m.currentView(); c != nil && c.name() == "diff" {
 				m.diff.opts.ignoreWhitespace = !m.diff.opts.ignoreWhitespace
 				m.diff.refresh()
 			}
@@ -206,7 +185,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ready":
 			m.watcherReady = true
 		case "filechange":
-			if m.currentView() == "diff" && m.diff.path == msg.path {
+			if m.currentViewName() == m.diff.name() && m.diff.path == msg.path {
 				m.diff.refresh()
 			}
 			m.stats.refresh()
@@ -221,13 +200,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m appModel) View() string {
 	mainSection := ""
 
-	switch m.currentView() {
-	case "commits":
-		mainSection = m.commits.render()
-	case "stats":
-		mainSection = m.stats.render()
-	case "diff":
-		mainSection = m.diff.render()
+	if c := m.currentView(); c != nil {
+		mainSection = c.render()
 	}
 
 	statusRightStyle.Width(5)
@@ -266,11 +240,9 @@ func main() {
 	}
 	os.Chdir(repoPath)
 
-	commits := gitLog()
-
 	m := appModel{
 		history: []string{"commits"},
-		commits: newCommitsModel(commits),
+		commits: newCommitsModel(),
 		stats:   newStatsModel(),
 		diff:    newDiffModel(),
 		status:  "",

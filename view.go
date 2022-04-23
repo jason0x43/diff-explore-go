@@ -8,6 +8,7 @@ type viewModel struct {
 type view interface {
 	setWidth(int)
 	setHeight(int)
+	setSize(int, int)
 	render() string
 	name() string
 }
