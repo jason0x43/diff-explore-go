@@ -4,47 +4,24 @@ import (
 	"fmt"
 	"os"
 
-	"strings"
-	"time"
-
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-type view string
 
 type watcherMessage struct {
 	event string
 	path  string
 }
 
-const (
-	commitsView view = "commits"
-	statsView        = "stats"
-	diffView         = "diff"
-)
-
-type diffModel struct {
-	path    string
-	oldPath string
-	list    listModel
-}
-
 type appModel struct {
 	height       int
 	width        int
-	history      []view
+	history      []string
 	watcherReady bool
 
-	commits     []commit
-	commitsList listModel
-
-	stats     []stat
-	statsList listModel
-
-	diff      []string
-	diffModel diffModel
-	diffOpts  diffOptions
+	commits commitsModel
+	stats   statsModel
+	diff    diffModel
 
 	status string
 }
@@ -56,215 +33,28 @@ func trunc(s string, size int) string {
 	return s
 }
 
-func (m appModel) renderCommit(index int) string {
-	c := m.commits[index]
-
-	ctime := time.Unix(c.Timestamp, 0)
-	var age string
-	years, months, days, hours, mins, secs, _ := Elapsed(ctime, time.Now())
-	if years > 0 {
-		age = fmt.Sprintf("%dY", years)
-	} else if months > 0 {
-		age = fmt.Sprintf("%dM", months)
-	} else if days > 0 {
-		age = fmt.Sprintf("%dD", days)
-	} else if hours > 0 {
-		age = fmt.Sprintf("%dh", hours)
-	} else if mins > 0 {
-		age = fmt.Sprintf("%dm", mins)
-	} else {
-		age = fmt.Sprintf("%ds", secs)
-	}
-
-	name := c.AuthorName
-	if len(name) > 20 {
-		parts := strings.Split(name, " ")
-		if len(parts) >= 3 {
-			name = fmt.Sprintf("%s ", parts[0])
-			for i := 0; i < len(parts)-2; i++ {
-				name += fmt.Sprintf("%c", parts[i][0])
-			}
-			name += fmt.Sprintf(" %s", parts[len(parts)-1])
-		} else if len(parts) == 2 {
-			name = fmt.Sprintf("%c %s", parts[0][0], parts[1])
-		} else {
-			name = name[0:20]
-		}
-	}
-
-	marker := ""
-	if index == m.commitsList.marked {
-		marker = "▶"
-	}
-
-	subjectStyle.Width(m.width -
-		markerStyle.GetWidth() -
-		hashStyle.GetWidth() -
-		ageStyle.GetWidth() -
-		nameStyle.GetWidth())
-
-	if index == m.commitsList.cursor {
-		markerStyle.Background(cursorBg)
-		hashStyle.Background(cursorBg)
-		ageStyle.Background(cursorBg)
-		nameStyle.Background(cursorBg)
-		branchStyle.Background(cursorBg)
-		tagStyle.Background(cursorBg)
-		refStyle.Background(cursorBg)
-		subjectStyle.Background(cursorBg)
-	} else {
-		markerStyle.UnsetBackground()
-		hashStyle.UnsetBackground()
-		ageStyle.UnsetBackground()
-		nameStyle.UnsetBackground()
-		branchStyle.UnsetBackground()
-		tagStyle.UnsetBackground()
-		refStyle.UnsetBackground()
-		subjectStyle.UnsetBackground()
-	}
-
-	branches := ""
-	tags := ""
-	refs := ""
-
-	if c.Decoration != "" {
-		info := parseDecoration(c.Decoration)
-		for _, b := range info.branches {
-			branches += fmt.Sprintf("[%s] ", b)
-		}
-		if branches != "" {
-			branches = branchStyle.Render(branches)
-		}
-
-		for _, t := range info.tags {
-			tags += fmt.Sprintf("<%s> ", t)
-		}
-		if tags != "" {
-			tags = tagStyle.Render(tags)
-		}
-
-		for _, r := range info.refs {
-			refs += fmt.Sprintf("{%s} ", r)
-		}
-		if refs != "" {
-			refs = refStyle.Render(refs)
-		}
-	}
-
-	return lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		markerStyle.Render(marker),
-		hashStyle.Render(c.Commit[0:8]),
-		ageStyle.Render(age),
-		nameStyle.Render(name),
-		branches,
-		tags,
-		refs,
-		subjectStyle.Render(c.Subject),
-	)
-}
-
-func (m appModel) renderStat(index int) string {
-	s := m.stats[index]
-
-	statStyle.Width(m.width)
-
-	statTypeStyle := statModStyle
-	if (s.Change[0] == 'A') {
-		statTypeStyle = statAddStyle
-	} else if (s.Change[0] == 'D') {
-		statTypeStyle = statRemStyle
-	}
-
-	if index == m.statsList.cursor {
-		statStyle.Background(cursorBg)
-		statTypeStyle.Background(cursorBg)
-	} else {
-		statStyle.UnsetBackground()
-		statTypeStyle.UnsetBackground()
-	}
-
-	path := s.Path
-	if s.OldPath != "" {
-		path = path + " ← " + s.OldPath
-	}
-
-	return lipgloss.JoinHorizontal(
-		lipgloss.Top,
-		statTypeStyle.Render(string(s.Change[0])),
-		statStyle.Render(path),
-	)
-}
-
-func (m appModel) renderDiffLine(index int) string {
-	d := m.diff[index]
-	d = strings.ReplaceAll(d, "\t", "    ")
-
-	if len(d) > 0 {
-		switch d[0] {
-		case '-':
-			return diffRemStyle.Render(d)
-		case '+':
-			return diffAddStyle.Render(d)
-		case '@':
-			return diffSepStyle.Render(d)
-		}
-	}
-
-	return diffNormalStyle.Render(d)
-}
-
-func (m appModel) currentView() view {
+func (m appModel) currentView() string {
 	return m.history[len(m.history)-1]
 }
 
-func (m appModel) pushView(view view) appModel {
+func (m *appModel) pushView(view string) {
 	m.history = append(m.history, view)
-	return m
 }
 
-func (m appModel) popView() appModel {
+func (m *appModel) popView() {
 	m.history = m.history[:len(m.history)-1]
-	return m
-}
-
-func (m appModel) getCommitRange() (start, end string) {
-	start = m.commits[m.commitsList.cursor].Commit
-	end = ""
-
-	if m.commitsList.marked >= 0 {
-		if m.commitsList.marked > m.commitsList.cursor {
-			end = start
-			start = m.commits[m.commitsList.marked].Commit
-		} else {
-			end = m.commits[m.commitsList.marked].Commit
-		}
-	}
-
-	return
 }
 
 func (m appModel) getStatus() string {
 	switch m.currentView() {
-	case commitsView:
-		start, end := m.getCommitRange()
-		if end == "" {
-			end = "<index>"
-		}
-		return fmt.Sprintf("%s..%s", trunc(start, 8), trunc(end, 8))
-	case statsView:
-		start, end := m.getCommitRange()
-		if end == "" {
-			end = "<index>"
-		}
-		return fmt.Sprintf("%s..%s", trunc(start, 8), trunc(end, 8))
-	case diffView:
-		start, end := m.getCommitRange()
-		if end == "" {
-			end = "<index>"
-		}
-		path := m.stats[m.statsList.cursor].Path
-		return fmt.Sprintf("%s..%s: %s", trunc(start, 8), trunc(end, 8), path)
+	case m.commits.name():
+		return m.commits.getRangeStr()
+	case m.stats.name():
+		return m.commits.getRangeStr()
+	case m.diff.name():
+		r := m.commits.getRangeStr()
+		path := m.stats.stat(m.stats.cursor).Path
+		return fmt.Sprintf("%s: %s", r, path)
 	}
 
 	return ""
@@ -279,13 +69,13 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
-		if m.currentView() == commitsView {
-			m.commitsList.setHeight(m.height)
-		} else if m.currentView() == statsView {
-			m.statsList.setHeight(m.height)
-		} else if m.currentView() == diffView {
-			m.diffModel.list.setHeight(m.height)
+		switch m.currentView() {
+		case "commits":
+			m.commits.setSize(msg.Width, msg.Height)
+		case "stats":
+			m.stats.setSize(msg.Width, msg.Height)
+		case "diff":
+			m.diff.setSize(msg.Width, msg.Height)
 		}
 
 	case tea.KeyMsg:
@@ -294,87 +84,71 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case " ":
-			if m.currentView() == commitsView {
-				if m.commitsList.marked == m.commitsList.cursor {
-					m.commitsList.marked = -1
-				} else {
-					m.commitsList.marked = m.commitsList.cursor
-				}
+			if m.currentView() == "commits" {
+				m.commits.mark()
 			}
 
 		case "ctrl+f":
-			if m.currentView() == commitsView {
-				m.commitsList.nextPage()
-			} else if m.currentView() == statsView {
-				m.statsList.nextPage()
-			} else if m.currentView() == diffView {
-				m.diffModel.list.nextPage()
+			switch m.currentView() {
+			case "commits":
+				m.commits.nextPage()
+			case "stats":
+				m.stats.nextPage()
+			case "diff":
+				m.diff.nextPage()
 			}
 
 		case "ctrl+u":
-			if m.currentView() == commitsView {
-				m.commitsList.prevPage()
-			} else if m.currentView() == statsView {
-				m.statsList.prevPage()
-			} else if m.currentView() == diffView {
-				m.diffModel.list.prevPage()
+			switch m.currentView() {
+			case "commits":
+				m.commits.prevPage()
+			case "stats":
+				m.stats.prevPage()
+			case "diff":
+				m.diff.prevPage()
 			}
 
 		case "j", "down":
-			if m.currentView() == commitsView {
-				m.commitsList.nextItem()
-			} else if m.currentView() == statsView {
-				m.statsList.nextItem()
-			} else if m.currentView() == diffView {
-				m.diffModel.list.nextItem()
+			switch m.currentView() {
+			case "commits":
+				m.commits.nextItem()
+			case "stats":
+				m.stats.nextItem()
+			case "diff":
+				m.diff.nextItem()
 			}
 
 		case "k", "up":
-			if m.currentView() == commitsView {
-				m.commitsList.prevItem()
-			} else if m.currentView() == statsView {
-				m.statsList.prevItem()
-			} else if m.currentView() == diffView {
-				m.diffModel.list.prevItem()
+			switch m.currentView() {
+			case "commits":
+				m.commits.prevItem()
+			case "stats":
+				m.stats.prevItem()
+			case "diff":
+				m.diff.prevItem()
 			}
 
 		case "enter":
-			if m.currentView() == commitsView {
-				start, end := m.getCommitRange()
-				m.stats = gitDiffStat(start, end)
-				m.statsList = listModel{
-					count:  len(m.stats),
-					marked: -1,
-				}
-				m.statsList.setHeight(m.height)
-				m = m.pushView(statsView)
-			} else if m.currentView() == statsView {
-				start, end := m.getCommitRange()
-				dm := m.stats[m.statsList.cursor]
-
-				m.diff = gitDiff(start, end, dm.Path, dm.OldPath, m.diffOpts)
-				m.diffModel = diffModel{
-					path:    dm.Path,
-					oldPath: dm.OldPath,
-					list:    newCursorlessListModel(len(m.diff)),
-				}
-				m.diffModel.list.setHeight(m.height)
-				m = m.pushView(diffView)
+			if m.currentView() == "commits" {
+				m.stats.setDiff(m.commits.getRange())
+				m.stats.setHeight(m.height)
+				m.pushView("stats")
+			} else if m.currentView() == "stats" {
+				m.diff.setDiff(m.commits.getRange(), m.stats.selected())
+				m.diff.setHeight(m.height)
+				m.pushView("diff")
 			}
 
 		case "esc", "q":
 			if len(m.history) == 1 {
 				return m, tea.Quit
 			}
-			m = m.popView()
+			m.popView()
 
 		case "w":
-			if m.currentView() == diffView {
-				m.diffOpts.ignoreWhitespace = !m.diffOpts.ignoreWhitespace
-				start, end := m.getCommitRange()
-				dm := m.diffModel
-				m.diff = gitDiff(start, end, dm.path, dm.oldPath, m.diffOpts)
-				m.diffModel.list.setCount(len(m.diff))
+			if m.currentView() == "diff" {
+				m.diff.opts.ignoreWhitespace = !m.diff.opts.ignoreWhitespace
+				m.diff.refresh()
 			}
 		}
 
@@ -383,15 +157,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ready":
 			m.watcherReady = true
 		case "filechange":
-			start, end := m.getCommitRange()
-			if m.currentView() == diffView && m.diffModel.path == msg.path {
-				dm := m.diffModel
-				m.diff = gitDiff(start, end, dm.path, dm.oldPath, m.diffOpts)
-				m.diffModel.list.setCount(len(m.diff))
+			if m.currentView() == "diff" && m.diff.path == msg.path {
+				m.diff.refresh()
 			}
-
-			m.stats = gitDiffStat(start, end)
-			m.statsList.setCount(len(m.stats))
+			m.stats.refresh()
 		}
 	}
 
@@ -404,26 +173,12 @@ func (m appModel) View() string {
 	mainSection := ""
 
 	switch m.currentView() {
-	case commitsView:
-		var lines []string
-		for i := m.commitsList.first; i < m.commitsList.last; i++ {
-			lines = append(lines, m.renderCommit(i))
-		}
-		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
-
-	case statsView:
-		var lines []string
-		for i := m.statsList.first; i < m.statsList.last; i++ {
-			lines = append(lines, m.renderStat(i))
-		}
-		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
-
-	case diffView:
-		var lines []string
-		for i := m.diffModel.list.first; i < m.diffModel.list.last; i++ {
-			lines = append(lines, m.renderDiffLine(i))
-		}
-		mainSection = lipgloss.JoinVertical(lipgloss.Left, lines...)
+	case "commits":
+		mainSection = m.commits.render()
+	case "stats":
+		mainSection = m.stats.render()
+	case "diff":
+		mainSection = m.diff.render()
 	}
 
 	statusRightStyle.Width(5)
@@ -435,7 +190,7 @@ func (m appModel) View() string {
 		statusRight += "-"
 	}
 
-	if m.diffOpts.ignoreWhitespace {
+	if m.diff.opts.ignoreWhitespace {
 		statusRight += "W"
 	}
 
@@ -462,11 +217,11 @@ func main() {
 	commits := gitLog()
 
 	m := appModel{
-		history:     []view{commitsView},
-		commits:     commits,
-		commitsList: newListModel(len(commits)),
-		statsList:   newListModel(0),
-		status:      "",
+		history: []string{"commits"},
+		commits: newCommitsModel(commits),
+		stats:   newStatsModel(),
+		diff:    newDiffModel(),
+		status:  "",
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())

@@ -1,27 +1,32 @@
 package main
 
 type listModel struct {
+	viewModel
 	count  int
 	first  int
 	last   int
-	height int
 	cursor int
 	marked int
 }
 
-func newListModel(count int) listModel {
-	return listModel{
-		count:  count,
-		marked: -1,
-		cursor: 0,
-	}
+type listView interface {
+	nextPage()
+	prevPage()
+	nextItem()
+	prevItem()
+	cursor()
+	setCursor(int)
+	marker()
+	setMarker(int)
 }
 
-func newCursorlessListModel(count int) listModel {
-	return listModel{
-		count:  count,
-		marked: -1,
-		cursor: -1,
+func (m *listModel) init(count int, cursor bool) {
+	m.count = count
+	m.marked = -1
+	if cursor {
+		m.cursor = 0
+	} else {
+		m.cursor = -1
 	}
 }
 
@@ -36,6 +41,11 @@ func (m *listModel) setHeight(height int) {
 		m.last = m.cursor + 1
 		m.first = m.last - m.height + 1
 	}
+}
+
+func (m *listModel) setSize(width, height int) {
+	m.setWidth(width)
+	m.setHeight(height)
 }
 
 func (m *listModel) setCount(count int) {
@@ -66,7 +76,7 @@ func (m *listModel) nextPage() {
 	}
 
 	delta := m.height
-	if m.last + m.height >= m.count {
+	if m.last+m.height >= m.count {
 		delta = m.count - m.last
 	}
 
@@ -87,7 +97,7 @@ func (m *listModel) prevPage() {
 	}
 
 	delta := m.height
-	if m.first - m.height < 0 {
+	if m.first-m.height < 0 {
 		delta = m.first
 	}
 
@@ -124,5 +134,13 @@ func (m *listModel) prevItem() {
 			m.first -= 1
 			m.last -= 1
 		}
+	}
+}
+
+func (m *listModel) mark() {
+	if m.marked == m.cursor {
+		m.marked = -1
+	} else {
+		m.marked = m.cursor
 	}
 }
