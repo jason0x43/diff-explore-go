@@ -180,11 +180,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.currentView() == "commits" {
 				m.stats.setDiff(m.commits.getRange())
-				m.stats.setHeight(m.height)
+				m.stats.setSize(m.width, m.height)
 				m.pushView("stats")
 			} else if m.currentView() == "stats" {
 				m.diff.setDiff(m.commits.getRange(), m.stats.selected())
-				m.diff.setHeight(m.height)
+				m.diff.setSize(m.width, m.height)
 				m.pushView("diff")
 			}
 
@@ -293,4 +293,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
