@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -37,10 +38,11 @@ func (c chord) getKey() string {
 }
 
 type appModel struct {
-	height       int
-	width        int
-	history      []string
-	watcherReady bool
+	height         int
+	width          int
+	history        []string
+	watcherReady   bool
+	watcherLoading spinner.Model
 
 	searching bool
 	query     string
@@ -109,7 +111,7 @@ func (m appModel) getStatus() string {
 }
 
 func (m appModel) Init() tea.Cmd {
-	return nil
+	return m.watcherLoading.Tick
 }
 
 func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -119,7 +121,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		if v := m.currentView(); v != nil {
 			// view height is 1 less than screen height
-			v.setSize(msg.Width, msg.Height - 1)
+			v.setSize(msg.Width, msg.Height-1)
 		}
 
 	case tea.KeyMsg:
@@ -129,7 +131,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.searching = false
 			case "backspace":
 				if len(m.query) > 0 {
-					m.query = m.query[0:len(m.query) - 1]
+					m.query = m.query[0 : len(m.query)-1]
 				}
 			case "enter":
 				m.searching = false
@@ -212,12 +214,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				if m.currentViewName() == m.commits.name() {
 					m.stats.setDiff(m.commits.getRange())
-					m.stats.setSize(m.width, m.height - 1)
+					m.stats.setSize(m.width, m.height-1)
 					m.pushView("stats")
 				} else if m.currentViewName() == m.stats.name() {
 					if m.stats.cursor >= 0 {
 						m.diff.setDiff(m.commits.getRange(), m.stats.selected())
-						m.diff.setSize(m.width, m.height - 1)
+						m.diff.setSize(m.width, m.height-1)
 						m.pushView("diff")
 					}
 				}
@@ -246,9 +248,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.stats.refresh()
 		}
-	}
 
-	m.status = m.getStatus()
+	default:
+		var cmd tea.Cmd
+		if !m.watcherReady {
+			m.watcherLoading, cmd = m.watcherLoading.Update(msg)
+			return m, cmd
+		}
+	}
 
 	return m, nil
 }
@@ -265,8 +272,7 @@ func (m appModel) View() string {
 
 	statusRight := ""
 	if !m.watcherReady {
-		// TODO use a spinner for this
-		statusRight += "-"
+		statusRight += m.watcherLoading.View()
 	}
 	if !m.chord.isExpired() && m.chord.key != "" {
 		statusRight += m.chord.key
@@ -278,7 +284,7 @@ func (m appModel) View() string {
 
 	status := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		statusLeftStyle.Render(m.status),
+		statusLeftStyle.Render(m.getStatus()),
 		statusRightStyle.Render(statusRight),
 	)
 
@@ -296,12 +302,16 @@ func main() {
 	}
 	os.Chdir(repoPath)
 
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+
 	m := appModel{
-		history: []string{"commits"},
-		commits: newCommitsModel(),
-		stats:   newStatsModel(),
-		diff:    newDiffModel(),
-		status:  "",
+		history:        []string{"commits"},
+		commits:        newCommitsModel(),
+		stats:          newStatsModel(),
+		diff:           newDiffModel(),
+		status:         "",
+		watcherLoading: s,
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen())
@@ -321,3 +331,4 @@ func main() {
 		os.Exit(1)
 	}
 }
+
