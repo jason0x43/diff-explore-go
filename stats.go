@@ -75,10 +75,21 @@ func (m statsModel) renderStat(index int) string {
 
 func (m statsModel) render() string {
 	var lines []string
-	for i := m.start; i < m.end; i++ {
-		lines = append(lines, m.renderStat(i))
+	if m.end - m.start == 0 {
+		for i := 0; i < m.height / 4; i++ {
+			lines = append(lines, "")
+		}
+		centerStyle := lipgloss.NewStyle().
+			Align(lipgloss.Center).
+			Width(m.width)
+		lines = append(lines, centerStyle.Render("No changes"))
+		return lipgloss.JoinVertical(lipgloss.Center, lines...)
+	} else {
+		for i := m.start; i < m.end; i++ {
+			lines = append(lines, m.renderStat(i))
+		}
+		return lipgloss.JoinVertical(lipgloss.Left, lines...)
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, lines...)
 }
 
 func (m *statsModel) findNext(query string) {

@@ -65,7 +65,7 @@ func (m *listModel) updateLayout() {
 			m.end = m.cursor + 1
 			m.start = max(m.end - m.height, 0)
 		} else if m.cursor < m.start {
-			m.start = m.cursor
+			m.start = max(m.cursor, 0)
 			m.end = min(m.start + m.height, m.count)
 		}
 	}
