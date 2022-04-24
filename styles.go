@@ -48,15 +48,14 @@ var statusThreeStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"})
 var statStyle = lipgloss.NewStyle().Inline(true)
 var statAddStyle = lipgloss.NewStyle().
-	Inline(true).
+	Align(lipgloss.Right).
 	Width(2).
 	Foreground(addFg)
-var statRemStyle = lipgloss.NewStyle().
-	Inline(true).
+var statDelStyle = lipgloss.NewStyle().
+	Align(lipgloss.Right).
 	Width(2).
 	Foreground(remFg)
 var statModStyle = lipgloss.NewStyle().
-	Inline(true).
 	Width(2).
 	Foreground(modFg)
 var diffNormalStyle = lipgloss.NewStyle().

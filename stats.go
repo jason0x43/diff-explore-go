@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"math"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -8,8 +10,10 @@ import (
 
 type statsModel struct {
 	listModel
-	stats   []stat
-	commits commitRange
+	stats     []stat
+	addsWidth int
+	delsWidth int
+	commits   commitRange
 }
 
 func newStatsModel() statsModel {
@@ -34,6 +38,14 @@ func (m *statsModel) setDiff(c commitRange) {
 	m.commits = c
 	m.stats = gitDiffStat(c.start, c.end)
 	m.listModel.init(len(m.stats), false)
+	m.addsWidth = 0
+	m.delsWidth = 0
+	for _, stat := range m.stats {
+		addDigits := int(math.Floor(math.Log10(float64(stat.Adds)))) + 1
+		delDigits := int(math.Floor(math.Log10(float64(stat.Dels)))) + 1
+		m.addsWidth = max(m.addsWidth, addDigits)
+		m.delsWidth = max(m.delsWidth, delDigits)
+	}
 }
 
 func (m *statsModel) refresh() {
@@ -43,40 +55,43 @@ func (m *statsModel) refresh() {
 
 func (m statsModel) renderStat(index int) string {
 	s := m.stats[index]
-
-	statStyle.Width(m.width)
-
-	statTypeStyle := statModStyle
-	if s.Change[0] == 'A' {
-		statTypeStyle = statAddStyle
-	} else if s.Change[0] == 'D' {
-		statTypeStyle = statRemStyle
-	}
+	parts := []string{}
 
 	if index == m.cursor {
 		statStyle.Background(cursorBg)
-		statTypeStyle.Background(cursorBg)
+		statAddStyle.Background(cursorBg)
+		statDelStyle.Background(cursorBg)
+		statModStyle.Background(cursorBg)
 	} else {
 		statStyle.UnsetBackground()
-		statTypeStyle.UnsetBackground()
+		statAddStyle.UnsetBackground()
+		statDelStyle.UnsetBackground()
+		statModStyle.UnsetBackground()
 	}
+
+	statAddStyle.Width(m.addsWidth + 1).PaddingRight(1)
+	parts = append(parts, statAddStyle.Render(fmt.Sprintf("%d", s.Adds)))
+	statDelStyle.Width(m.delsWidth + 1).PaddingRight(1)
+	parts = append(parts, statDelStyle.Render(fmt.Sprintf("%d", s.Dels)))
+
+	statStyle.Width(m.width)
 
 	path := s.Path
 	if s.OldPath != "" {
 		path = path + " ← " + s.OldPath
 	}
+	parts = append(parts, statStyle.Render(path))
 
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		statTypeStyle.Render(string(s.Change[0])),
-		statStyle.Render(path),
+		parts...,
 	)
 }
 
 func (m statsModel) render() string {
 	var lines []string
-	if m.end - m.start == 0 {
-		for i := 0; i < m.height / 4; i++ {
+	if m.end-m.start == 0 {
+		for i := 0; i < m.height/4; i++ {
 			lines = append(lines, "")
 		}
 		centerStyle := lipgloss.NewStyle().

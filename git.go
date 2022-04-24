@@ -2,11 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 )
+
+var renameThreshold = 50
 
 type commit struct {
 	Commit      string
@@ -79,7 +83,8 @@ func gitLog() []commit {
 }
 
 type stat struct {
-	Change  string
+	Adds    int
+	Dels    int
 	Path    string
 	OldPath string
 }
@@ -93,7 +98,8 @@ func gitDiffStat(start, end string) []stat {
 	out, err := exec.Command(
 		"git",
 		"diff",
-		"--name-status",
+		"--numstat",
+		fmt.Sprintf("--find-renames=%d", renameThreshold),
 		commit,
 	).Output()
 	if err != nil {
@@ -108,22 +114,15 @@ func gitDiffStat(start, end string) []stat {
 			continue
 		}
 
+		parts := strings.Split(line, "\t")
+
 		s := stat{}
-		change, path, _ := strings.Cut(line, "\t")
-		if change == "" {
-			log.Fatal("No change for", line, "\n")
-		}
+		s.Adds, _ = strconv.Atoi(parts[0])
+		s.Dels, _ = strconv.Atoi(parts[1])
 
-		s.Change = change
-
-		path = strings.TrimSpace(path)
-
-		if change[0] == 'R' {
-			oldPath, newPath, _ := strings.Cut(path, "\t")
-			s.Path = strings.TrimSpace(newPath)
-			s.OldPath = strings.TrimSpace(oldPath)
-		} else {
-			s.Path = strings.TrimSpace(path)
+		s.Path = strings.TrimSpace(parts[2])
+		if strings.Contains(s.Path, " => ") {
+			s.OldPath, s.Path, _ = strings.Cut(s.Path, " => ")
 		}
 		stats = append(stats, s)
 	}
@@ -148,6 +147,7 @@ func gitDiff(start, end, path, oldPath string, options diffOptions) []string {
 		command,
 		"-M",
 		"--patience",
+		fmt.Sprintf("--find-renames=%d", renameThreshold),
 		"-p",
 	}
 
