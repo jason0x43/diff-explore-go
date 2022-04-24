@@ -54,11 +54,20 @@ func (m *listModel) setCount(count int) {
 }
 
 func (m *listModel) updateLayout() {
-	m.cursor = min(m.cursor, m.count-1)
 	m.end = min(m.start+m.height, m.count)
-	if m.cursor >= m.end {
-		m.end = m.cursor + 1
-		m.start = m.end - m.height
+	if m.end - m.start < m.height {
+		m.start = max(m.end - m.height, 0)
+	}
+
+	if !m.scrollLock {
+		m.cursor = min(m.cursor, m.count - 1)
+		if m.cursor >= m.end {
+			m.end = m.cursor + 1
+			m.start = max(m.end - m.height, 0)
+		} else if m.cursor < m.start {
+			m.start = m.cursor
+			m.end = min(m.start + m.height, m.count)
+		}
 	}
 }
 
@@ -158,7 +167,7 @@ func (m listModel) getEnd() int {
 
 func (m listModel) getCursor() int {
 	if m.scrollLock {
-		return m.end
+		return m.end - 1
 	}
 	return m.cursor
 }
