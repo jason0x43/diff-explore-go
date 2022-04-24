@@ -267,25 +267,39 @@ func (m appModel) View() string {
 		mainSection = c.render()
 	}
 
-	statusRightStyle.Width(5)
-	statusLeftStyle.Width(m.width - statusRightStyle.GetWidth())
-
-	statusRight := ""
+	statusTwo := ""
 	if !m.watcherReady {
-		statusRight += m.watcherLoading.View()
+		statusTwo += m.watcherLoading.View()
 	}
 	if !m.chord.isExpired() && m.chord.key != "" {
-		statusRight += m.chord.key
+		statusTwo += m.chord.key
 	}
 
 	if m.diff.opts.ignoreWhitespace {
-		statusRight += "W"
+		statusTwo += "W"
 	}
+
+	statusTwoStyle.Width(len(statusTwo) + 2)
+
+	statusThree := fmt.Sprintf(
+		"%d/%d",
+		m.currentView().getCursor(),
+		m.currentView().getCount()-1,
+	)
+
+	statusThreeStyle.Width(len(statusThree) + 2)
+
+	statusOneStyle.Width(
+		m.width -
+			statusTwoStyle.GetWidth() -
+			statusThreeStyle.GetWidth(),
+	)
 
 	status := lipgloss.JoinHorizontal(
 		lipgloss.Top,
-		statusLeftStyle.Render(m.getStatus()),
-		statusRightStyle.Render(statusRight),
+		statusOneStyle.Render(m.getStatus()),
+		statusTwoStyle.Render(statusTwo),
+		statusThreeStyle.Render(statusThree),
 	)
 
 	return lipgloss.JoinVertical(
@@ -331,4 +345,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-

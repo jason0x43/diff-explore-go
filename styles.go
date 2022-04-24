@@ -30,15 +30,21 @@ var tagStyle = lipgloss.NewStyle().
 var refStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color("3"))
 var subjectStyle = lipgloss.NewStyle().Inline(true)
-var statusLeftStyle = lipgloss.NewStyle().
+var statusOneStyle = lipgloss.NewStyle().
 	Inline(true).
 	Background(lipgloss.Color("8")).
 	Foreground(lipgloss.Color("15"))
-var statusRightStyle = lipgloss.NewStyle().
+var statusTwoStyle = lipgloss.NewStyle().
 	Inline(true).
 	Width(5).
 	Align(lipgloss.Center).
-	Background(lipgloss.Color("4")).
+	Background(lipgloss.Color("7")).
+	Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"})
+var statusThreeStyle = lipgloss.NewStyle().
+	Inline(true).
+	Width(3).
+	Align(lipgloss.Center).
+	Background(lipgloss.Color("12")).
 	Foreground(lipgloss.AdaptiveColor{Light: "0", Dark: "15"})
 var statStyle = lipgloss.NewStyle().Inline(true)
 var statAddStyle = lipgloss.NewStyle().

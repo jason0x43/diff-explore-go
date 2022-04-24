@@ -22,6 +22,9 @@ type listView interface {
 	scrollToBottom()
 	findNext(string)
 	findPrev(string)
+	getCount() int
+	getEnd() int
+	getCursor() int
 }
 
 func (m *listModel) init(count int, scrollLock bool) {
@@ -143,4 +146,19 @@ func (m *listModel) scrollBy(amount int) {
 		m.start = max(m.start + amount, 0)
 		m.end = min(m.start + m.height, m.count)
 	}
+}
+
+func (m listModel) getCount() int {
+	return m.count
+}
+
+func (m listModel) getEnd() int {
+	return m.end
+}
+
+func (m listModel) getCursor() int {
+	if m.scrollLock {
+		return m.end
+	}
+	return m.cursor
 }
