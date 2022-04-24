@@ -1,15 +1,27 @@
 package main
 
-func min(a, b int) int {
-	if a <= b {
-		return a
+func min(a, b int, c ...int) int {
+	minVal := a
+	if b < a {
+		minVal = b
 	}
-	return b
+	for _, val := range c {
+		if val < minVal {
+			minVal = val
+		}
+	}
+	return minVal
 }
 
-func max(a, b int) int {
-	if a >= b {
-		return a
+func max(a, b int, c ...int) int {
+	maxVal := a
+	if b > a {
+		maxVal = b
 	}
-	return b
+	for _, val := range c {
+		if val > maxVal {
+			maxVal = val
+		}
+	}
+	return maxVal
 }

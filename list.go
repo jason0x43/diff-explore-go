@@ -3,8 +3,8 @@ package main
 type listModel struct {
 	viewModel
 	count      int
-	first      int
-	last       int
+	start      int
+	end        int
 	marked     int
 	cursor     int
 	scrollLock bool
@@ -36,16 +36,8 @@ func (m *listModel) init(count int, scrollLock bool) {
 }
 
 func (m *listModel) setHeight(height int) {
-	if height > m.count {
-		m.height = m.count + 1
-	} else {
-		m.height = height
-	}
-	m.last = m.first + m.height - 1
-	if m.cursor > m.last-1 {
-		m.last = m.cursor + 1
-		m.first = m.last - m.height + 1
-	}
+	m.height = height
+	m.updateLayout()
 }
 
 func (m *listModel) setSize(width, height int) {
@@ -55,90 +47,47 @@ func (m *listModel) setSize(width, height int) {
 
 func (m *listModel) setCount(count int) {
 	m.count = count
-	if count < m.height {
-		m.height = m.count
-	}
-	m.last = m.first + m.height - 1
-	if m.last > m.count-1 {
-		m.last = m.count - 1
-	}
-	if m.cursor > m.last-1 {
-		m.last = m.cursor + 1
-		m.first = m.last - m.height + 1
+	m.updateLayout()
+}
+
+func (m *listModel) updateLayout() {
+	m.cursor = min(m.cursor, m.count-1)
+	m.end = min(m.start+m.height, m.count)
+	if m.cursor >= m.end {
+		m.end = m.cursor + 1
+		m.start = m.end - m.height
 	}
 }
 
 func (m *listModel) nextPage() {
-	if !m.scrollLock {
-		m.cursor += m.height
-		if m.cursor >= m.count {
-			m.cursor = m.count - 1
-		}
+	if m.scrollLock {
+		m.scrollBy(m.height)
+	} else {
+		m.setCursor(min(m.cursor+m.height, m.count-1))
 	}
-
-	if m.last == m.count {
-		return
-	}
-
-	delta := m.height
-	if m.last+m.height >= m.count {
-		delta = m.count - m.last
-	}
-
-	m.last += delta
-	m.first += delta
 }
 
 func (m *listModel) prevPage() {
-	if !m.scrollLock {
-		m.cursor -= m.height
-		if m.cursor < 0 {
-			m.cursor = 0
-		}
+	if m.scrollLock {
+		m.scrollBy(-m.height)
+	} else {
+		m.setCursor(max(m.cursor-m.height, 0))
 	}
-
-	if m.first == 0 {
-		return
-	}
-
-	delta := m.height
-	if m.first-m.height < 0 {
-		delta = m.first
-	}
-
-	m.first -= delta
-	m.last -= delta
 }
 
 func (m *listModel) nextItem() {
 	if m.scrollLock {
-		// Not using cursor
-		if m.last < m.count-1 {
-			m.first += 1
-			m.last += 1
-		}
+		m.scrollBy(1)
 	} else if m.cursor < m.count-1 {
-		m.cursor += 1
-		if m.cursor > m.last-1 {
-			m.first += 1
-			m.last += 1
-		}
+		m.setCursor(m.cursor + 1)
 	}
 }
 
 func (m *listModel) prevItem() {
 	if m.scrollLock {
-		// Not using cursor
-		if m.first > 0 {
-			m.first -= 1
-			m.last -= 1
-		}
+		m.scrollBy(-1)
 	} else if m.cursor > 0 {
-		m.cursor -= 1
-		if m.cursor < m.first {
-			m.first -= 1
-			m.last -= 1
-		}
+		m.setCursor(m.cursor - 1)
 	}
 }
 
@@ -155,20 +104,43 @@ func (m *listModel) setCursor(index int) {
 		m.cursor = -1
 	} else {
 		m.cursor = index
-		if m.cursor > m.last-1 {
-			m.last = m.cursor + 1
-			m.first = max(m.last-m.height+1, 0)
-		} else if m.cursor < m.first {
-			m.first = m.cursor
-			m.last = min(m.first+m.height, m.count) - 1
+		if m.cursor > m.end-1 {
+			m.end = m.cursor + 1
+			m.start = max(m.end-m.height, 0)
+		} else if m.cursor < m.start {
+			m.start = m.cursor
+			m.end = min(m.start+m.height, m.count)
 		}
 	}
 }
 
 func (m *listModel) scrollToBottom() {
-	m.setCursor(m.count - 1)
+	if m.scrollLock {
+		m.end = m.count
+		m.start = max(m.end-m.height, 0)
+	} else {
+		m.setCursor(m.count - 1)
+	}
 }
 
 func (m *listModel) scrollToTop() {
-	m.setCursor(0)
+	if m.scrollLock {
+		m.start = 0
+		m.end = min(m.start+m.height, m.count)
+	} else {
+		m.setCursor(0)
+	}
+}
+
+func (m *listModel) scrollBy(amount int) {
+	if amount == 0 {
+		return
+	}
+	if amount > 0 {
+		m.end = min(m.end + amount, m.count)
+		m.start = max(m.end - m.height, 0)
+	} else {
+		m.start = max(m.start + amount, 0)
+		m.end = min(m.start + m.height, m.count)
+	}
 }

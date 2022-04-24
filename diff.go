@@ -17,7 +17,7 @@ type diffModel struct {
 
 func newDiffModel() diffModel {
 	m := diffModel{}
-	m.listModel.init(0, false)
+	m.listModel.init(0, true)
 	return m
 }
 
@@ -61,7 +61,7 @@ func (m diffModel) renderDiffLine(index int) string {
 
 func (m diffModel) render() string {
 	var lines []string
-	for i := m.first; i < m.last; i++ {
+	for i := m.start; i < m.end; i++ {
 		lines = append(lines, m.renderDiffLine(i))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)

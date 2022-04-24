@@ -118,7 +118,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		if v := m.currentView(); v != nil {
-			v.setSize(msg.Width, msg.Height)
+			// view height is 1 less than screen height
+			v.setSize(msg.Width, msg.Height - 1)
 		}
 
 	case tea.KeyMsg:
@@ -211,12 +212,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				if m.currentViewName() == m.commits.name() {
 					m.stats.setDiff(m.commits.getRange())
-					m.stats.setSize(m.width, m.height)
+					m.stats.setSize(m.width, m.height - 1)
 					m.pushView("stats")
 				} else if m.currentViewName() == m.stats.name() {
 					if m.stats.cursor >= 0 {
 						m.diff.setDiff(m.commits.getRange(), m.stats.selected())
-						m.diff.setSize(m.width, m.height)
+						m.diff.setSize(m.width, m.height - 1)
 						m.pushView("diff")
 					}
 				}

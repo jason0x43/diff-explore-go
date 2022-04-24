@@ -75,7 +75,7 @@ func (m statsModel) renderStat(index int) string {
 
 func (m statsModel) render() string {
 	var lines []string
-	for i := m.first; i < m.last; i++ {
+	for i := m.start; i < m.end; i++ {
 		lines = append(lines, m.renderStat(i))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)

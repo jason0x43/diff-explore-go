@@ -66,7 +66,6 @@ func gitLog() []commit {
 			"  \"subject\": \"%f\"%n"+
 			"},",
 	).Output()
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,7 +102,8 @@ func gitDiffStat(start, end string) []stat {
 
 	var stats []stat
 
-	for _, line := range strings.Split(string(out), "\n") {
+	outStr := strings.TrimSuffix(string(out), "\n")
+	for _, line := range strings.Split(outStr, "\n") {
 		if len(line) == 0 {
 			continue
 		}
@@ -166,7 +166,8 @@ func gitDiff(start, end, path, oldPath string, options diffOptions) []string {
 		log.Fatal(err)
 	}
 
-	return strings.Split(string(out), "\n")
+	outStr := strings.TrimSuffix(string(out), "\n")
+	return strings.Split(outStr, "\n")
 }
 
 type decor struct {

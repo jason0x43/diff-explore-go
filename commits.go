@@ -147,7 +147,7 @@ func (m commitsModel) renderCommit(index int) string {
 
 func (m commitsModel) render() string {
 	var lines []string
-	for i := m.first; i < m.last; i++ {
+	for i := m.start; i < m.end; i++ {
 		lines = append(lines, m.renderCommit(i))
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
