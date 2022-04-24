@@ -271,9 +271,6 @@ func (m appModel) View() string {
 	if !m.watcherReady {
 		statusTwo += m.watcherLoading.View()
 	}
-	if !m.chord.isExpired() && m.chord.key != "" {
-		statusTwo += m.chord.key
-	}
 
 	if m.diff.opts.ignoreWhitespace {
 		statusTwo += "W"
