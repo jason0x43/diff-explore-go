@@ -126,7 +126,7 @@ func (m *statsModel) findNext(query string) {
 	for i := m.cursor + 1; i < m.count; i++ {
 		c := strings.ToLower(m.renderStat(i))
 		if strings.Contains(c, q) {
-			m.cursor = i
+			m.setCursor(i)
 			break
 		}
 	}
@@ -137,7 +137,7 @@ func (m *statsModel) findPrev(query string) {
 	for i := m.cursor - 1; i >= 0; i++ {
 		c := strings.ToLower(m.renderStat(i))
 		if strings.Contains(c, q) {
-			m.cursor = i
+			m.setCursor(i)
 			break
 		}
 	}
