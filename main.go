@@ -99,9 +99,9 @@ func (m appModel) getStatus() string {
 		case m.commits.name():
 			return m.commits.getRangeStr()
 		case m.stats.name():
-			return m.commits.getRangeStr()
+			return m.stats.getCommitsStr()
 		case m.diff.name():
-			r := m.commits.getRangeStr()
+			r := m.stats.getCommitsStr()
 			path := m.stats.stat(m.stats.cursor).Path
 			return fmt.Sprintf("%s: %s", r, path)
 		}
@@ -218,10 +218,18 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pushView("stats")
 				} else if m.currentViewName() == m.stats.name() {
 					if m.stats.cursor >= 0 {
-						m.diff.setDiff(m.commits.getRange(), m.stats.selected())
+						m.diff.setDiff(m.stats.commits, m.stats.selected())
 						m.diff.setSize(m.width, m.height-1)
 						m.pushView("diff")
 					}
+				}
+
+			case "s":
+				if m.currentViewName() == m.commits.name() {
+					commit := m.commits.selected().Commit
+					m.stats.setDiff(commitRange{start: commit, end: commit})
+					m.stats.setSize(m.width, m.height-1)
+					m.pushView("stats")
 				}
 
 			case "esc", "q":

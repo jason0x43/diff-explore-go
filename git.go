@@ -137,7 +137,9 @@ type diffOptions struct {
 func gitDiff(start, end, path, oldPath string, options diffOptions) []string {
 	commit := start
 	command := "diff-index"
-	if end != "" {
+	if end == start {
+		command = "show"
+	} else if end != "" {
 		command = "diff-tree"
 		commit += ".." + end
 	}
@@ -145,7 +147,6 @@ func gitDiff(start, end, path, oldPath string, options diffOptions) []string {
 	args := []string{
 		"git",
 		command,
-		"-M",
 		"--patience",
 		fmt.Sprintf("--find-renames=%d", renameThreshold),
 		"-p",
@@ -199,4 +200,41 @@ func parseDecoration(decoration string) (d decor) {
 	}
 
 	return
+}
+
+func gitShow(commit string) []stat {
+	out, err := exec.Command(
+		"git",
+		"show",
+		"--numstat",
+		"--format=",
+		fmt.Sprintf("--find-renames=%d", renameThreshold),
+		commit,
+	).Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var stats []stat
+
+	outStr := strings.TrimSuffix(string(out), "\n")
+	for _, line := range strings.Split(outStr, "\n") {
+		if len(line) == 0 {
+			continue
+		}
+
+		parts := strings.Split(line, "\t")
+
+		s := stat{}
+		s.Adds, _ = strconv.Atoi(parts[0])
+		s.Dels, _ = strconv.Atoi(parts[1])
+
+		s.Path = strings.TrimSpace(parts[2])
+		if strings.Contains(s.Path, " => ") {
+			s.OldPath, s.Path, _ = strings.Cut(s.Path, " => ")
+		}
+		stats = append(stats, s)
+	}
+
+	return stats
 }

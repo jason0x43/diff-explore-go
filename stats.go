@@ -34,9 +34,23 @@ func (m statsModel) selected() stat {
 	return m.stats[m.cursor]
 }
 
+func (m statsModel) getCommitsStr() string {
+	if m.commits.start == m.commits.end {
+		return m.commits.start[:8]
+	}
+	if m.commits.end == "" {
+		return fmt.Sprintf("%s..<index>", m.commits.start[:8])
+	}
+	return fmt.Sprintf("%s..%s", m.commits.start[:8], m.commits.end[:8])
+}
+
 func (m *statsModel) setDiff(c commitRange) {
 	m.commits = c
-	m.stats = gitDiffStat(c.start, c.end)
+	if c.start == c.end {
+		m.stats = gitShow(c.start)
+	} else {
+		m.stats = gitDiffStat(c.start, c.end)
+	}
 	m.listModel.init(len(m.stats), false)
 	m.addsWidth = 0
 	m.delsWidth = 0
